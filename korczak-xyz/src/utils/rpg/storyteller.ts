@@ -47,7 +47,7 @@ import {
 } from './genesis';
 import { appendText, dropRequest, endRequest, startRequest, updateRequest, type DevRequest } from './devlog';
 import type { Usage } from './cost';
-import { demoRefusal, rpgDemoUrl } from './demo';
+import { demoRefusal, guestId, rpgDemoUrl } from './demo';
 import { DEMO_MODELS, type RpgDemoReason } from './demoLimits';
 import { llmJobId, textRandom, type JobDoc, type JobParse, type LlmSpec } from './jobs';
 import { jobsOn, runServerJob } from './serverJobs';
@@ -339,7 +339,7 @@ async function askDemo(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: dog.controller.signal,
-    body: JSON.stringify({ ...body, model, ...(thinking ? { thinking } : {}) }),
+    body: JSON.stringify({ ...body, model, guest: guestId(), ...(thinking ? { thinking } : {}) }),
   });
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -475,7 +475,8 @@ async function askOpenAi(
 function tryNext(e: unknown): boolean {
   if (dropped(e)) return true;
   if (!(e instanceof ProviderError)) return false;
-  // A cap is a dollar amount, and the next model in the chain is cheaper and may still fit it.
+  // A cap is a dollar amount, and the next model in the chain is cheaper and may still fit it. A
+  // guest's spent allowance is a count, which no model fits.
   if (e.refusal) return e.refusal === 'ip-cap' || e.refusal === 'all-cap';
   return (
     e.timedOut ||

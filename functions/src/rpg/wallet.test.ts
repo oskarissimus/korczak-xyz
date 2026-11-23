@@ -35,7 +35,11 @@ vi.mock('../runtime', () => {
 
 import { reserveDiesel, settleDiesel, topUpDiesel, walletStatus } from './wallet';
 
-beforeEach(() => store.clear());
+// The tank these tests pour is the panel's $1, not the default sign-up bonus (`grantOf` tests that).
+beforeEach(() => {
+  store.clear();
+  store.set('rpgDiesel/config', { grantUsd: 1 });
+});
 
 describe('the diesel tank', () => {
   it('grants a new account its first tank once, and says which server keys diesel can stand in for', async () => {

@@ -8,7 +8,7 @@
  * on a reader's own key. A clip goes out as its line, its voice and its language.
  */
 
-import type { RpgDemoReason } from './demoLimits';
+import { guestIdOf, type GuestUse, type RpgDemoReason } from './demoLimits';
 
 /** Stands in for an ElevenLabs key in `voice.ts`: "speak through the demo". Never a real key. */
 export const DEMO_VOICE_KEY = 'demo:rpg';
@@ -24,6 +24,38 @@ export interface RpgDemoStatus {
   dailyUsd: number;
   /** Today across the whole site (`stats.ts`), or null from a function older than it. */
   today: { launches: number; playMs: number; usd: number } | null;
+  /** What this browser's guest has left of its one world and one first beat; null from an older function. */
+  guest: GuestUse | null;
+  /** The account's sign-up tank in dollars (`rpgDiesel/config`), for the invitation; null when unknown. */
+  signupUsd: number | null;
+}
+
+const GUEST_KEY = 'rpg-guest';
+
+/**
+ * This browser's guest id: random, minted once and kept, sent with every ask of the demo so the server
+ * can count the guest's one world and one first beat (`GUEST_ALLOWANCE`). Clearing the browser mints a
+ * new one, which the server bounds per address; a browser that keeps nothing gets one per page load.
+ */
+let memoryGuest: string | null = null;
+export function guestId(): string {
+  try {
+    const kept = guestIdOf(localStorage.getItem(GUEST_KEY));
+    if (kept) return kept;
+  } catch {
+    /* no storage: this page load's id */
+  }
+  if (!memoryGuest) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    memoryGuest = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  try {
+    localStorage.setItem(GUEST_KEY, memoryGuest);
+  } catch {
+    /* kept in memory */
+  }
+  return memoryGuest;
 }
 
 export function rpgDemoUrl(): string | null {
@@ -43,7 +75,7 @@ export async function fetchRpgDemoStatus(signal?: AbortSignal): Promise<RpgDemoS
   const url = rpgDemoUrl();
   if (!url) return null;
   try {
-    const response = await fetch(url, { signal });
+    const response = await fetch(`${url}?guest=${encodeURIComponent(guestId())}`, { signal });
     if (!response.ok) return null;
     const raw = (await response.json()) as Record<string, unknown>;
     const remaining = (raw.remaining ?? {}) as Record<string, unknown>;
@@ -56,6 +88,11 @@ export async function fetchRpgDemoStatus(signal?: AbortSignal): Promise<RpgDemoS
       perIpUsd: num(raw.perIpUsd),
       dailyUsd: num(raw.dailyUsd),
       today: today ? { launches: num(today.launches), playMs: num(today.playMs), usd: num(today.usd) } : null,
+      guest:
+        raw.guest && typeof raw.guest === 'object'
+          ? (({ worlds, beats, voiceUsd }) => ({ worlds: num(worlds), beats: num(beats), voiceUsd: num(voiceUsd) }))(raw.guest as Record<string, unknown>)
+          : null,
+      signupUsd: typeof raw.signupUsd === 'number' && Number.isFinite(raw.signupUsd) ? raw.signupUsd : null,
     };
   } catch {
     return null;
@@ -65,7 +102,7 @@ export async function fetchRpgDemoStatus(signal?: AbortSignal): Promise<RpgDemoS
 /** A refusal's reason, when the body is the demo's own and not Google's passed on. */
 export function demoRefusal(body: unknown): RpgDemoReason | null {
   const reason = (body as { reason?: unknown } | null)?.reason;
-  return reason === 'disabled' || reason === 'no-key' || reason === 'app-off' || reason === 'ip-cap' || reason === 'all-cap'
+  return reason === 'disabled' || reason === 'no-key' || reason === 'app-off' || reason === 'ip-cap' || reason === 'all-cap' || reason === 'guest-done'
     ? reason
     : null;
 }

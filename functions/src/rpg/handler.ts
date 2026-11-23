@@ -5,8 +5,11 @@
  *
  * It is the roaster's demo (`demo/handler.ts`) again, with what differs about a quest:
  *
- * - **The budget is dollars** (`utils/rpg/demoLimits.ts`): $4 per address and $10 across everybody
- *   per Warsaw day by default, at the owner's request. Every call reserves its worst case in a
+ * - **A guest gets one world and the first beat of one quest** (`GUEST_ALLOWANCE`), counted per
+ *   browser in `demoGuests/{guest id}` and never refilled; then the game asks them to make an account,
+ *   whose first tank is the sign-up bonus (`wallet.ts`). Not diesel: nothing here is shown as litres.
+ * - **Behind it the budget is dollars** (`utils/rpg/demoLimits.ts`): $4 per address and $10 across
+ *   everybody per Warsaw day by default, a backstop the guest's allowance stays far under. Every call reserves its worst case in a
  *   transaction before it is made and is settled at what it cost, so the caps cannot be passed.
  * - **The prompt is built here**, by the game's own `beatPrompt`, from a context checked field by
  *   field (`demoContext`). The model is one of the game's own list (`DEMO_MODELS`).
@@ -25,7 +28,8 @@
  *
  * The keys are read at call time: the server's own, set on the game's admin panel (`admin.ts`),
  * and failing those the paying account's own store, as the roaster's demo reads them; nothing in a request names that account, and no answer says whose it is. Nothing about the
- * caller is stored but a day-keyed hash of the address holding a number of dollars.
+ * caller is stored but a day-keyed hash of the address holding a number of dollars, and the count a
+ * guest id (random, minted by the browser) has used of its allowance.
  */
 
 import type { Request } from 'firebase-functions/v2/https';
@@ -46,6 +50,11 @@ import {
   checkRpgDemo,
   clipCost,
   demoContext,
+  guestIdOf,
+  guestLeft,
+  guestMay,
+  guestUseOf,
+  type GuestAsk,
   normalizeRpgDemo,
   priceAs,
   remainingUsd,
@@ -75,6 +84,7 @@ import { uiStrings } from './ui';
 import { normLang } from '../../../korczak-xyz/src/utils/rpg/language';
 import { flushSentry, reportError } from '../sentry';
 import { noteRefusal } from './walletAlarm';
+import { grantUsd } from './wallet';
 
 const VOICE_MODEL = FLASH_MODEL;
 
@@ -163,6 +173,13 @@ function counters(day: string, ip: string) {
   return { allDoc, ipDoc: allDoc.collection('ips').doc(ipKey(ip, day)) };
 }
 
+function guestDoc(id: string) {
+  return db.collection('demoGuests').doc(id);
+}
+
+/** The guest a request names (`demo.ts`), and what it asks of the allowance. */
+type Guest = { id: string | null; ask: GuestAsk };
+
 function dollars(snap: FirebaseFirestore.DocumentSnapshot): number {
   const value = snap.exists ? snap.data()?.usd : 0;
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
@@ -174,33 +191,55 @@ async function readSpent(day: string, ip: string): Promise<{ ip: number; all: nu
   return { ip: dollars(mine), all: dollars(all) };
 }
 
-/** Reserves `cost` against both caps, or says which one it would pass. */
+/** What one go takes from a guest's allowance: a world, a beat, or a clip's dollars. */
+function guestTake(ask: GuestAsk, sign: 1 | -1): Record<string, unknown> {
+  if (ask.kind === 'voice') return { voiceUsd: FieldValue.increment(sign * ask.usd) };
+  return { [ask.kind === 'world' ? 'worlds' : 'beats']: FieldValue.increment(sign) };
+}
+
+/**
+ * Reserves `cost` against both caps and the guest's allowance in one transaction, or says which it
+ * would pass. A request naming no guest (a page older than the allowance) is refused as spent.
+ */
 async function reserve(
   settings: RpgDemoSettings,
   day: string,
   ip: string,
   cost: number,
+  guest: Guest,
 ): Promise<{ ok: true; spent: { ip: number; all: number } } | { ok: false; status: number; reason: string }> {
   const { allDoc, ipDoc } = counters(day, ip);
+  if (!guest.id) return { ok: false, status: 402, reason: 'guest-done' };
+  const gDoc = guestDoc(guest.id);
   return db.runTransaction(async (tx) => {
-    const [all, mine] = await Promise.all([tx.get(allDoc), tx.get(ipDoc)]);
+    const [all, mine, g] = await Promise.all([tx.get(allDoc), tx.get(ipDoc), tx.get(gDoc)]);
     const spent = { ip: dollars(mine), all: dollars(all) };
     const verdict = checkRpgDemo(settings, spent, cost);
     if (!verdict.ok) return { ok: false as const, status: verdict.status, reason: verdict.reason };
+    const ipGuests = Number(mine.data()?.guests) || 0;
+    if (!guestMay(guestUseOf(g.data()), guest.ask, !g.exists, ipGuests)) return { ok: false as const, status: 402, reason: 'guest-done' };
     tx.set(allDoc, { usd: FieldValue.increment(cost), app: 'rpg', day, at: Date.now() }, { merge: true });
-    tx.set(ipDoc, { usd: FieldValue.increment(cost), day, at: Date.now() }, { merge: true });
+    tx.set(ipDoc, { usd: FieldValue.increment(cost), day, at: Date.now(), ...(g.exists ? {} : { guests: FieldValue.increment(1) }) }, { merge: true });
+    tx.set(gDoc, { ...guestTake(guest.ask, 1), at: Date.now(), ...(g.exists ? {} : { since: Date.now() }) }, { merge: true });
     return { ok: true as const, spent: { ip: spent.ip + cost, all: spent.all + cost } };
   });
 }
 
-/** Gives back what a call reserved and did not spend. Never below zero, never above the claim. */
-async function settle(day: string, ip: string, reserved: number, actual: number): Promise<void> {
+/**
+ * Gives back what a call reserved and did not spend. Never below zero, never above the claim. A world
+ * or a beat nothing was paid for (refused upstream) gives the guest the go back; a clip its dollars.
+ */
+async function settle(day: string, ip: string, reserved: number, actual: number, guest: Guest): Promise<void> {
   const refund = reserved - Math.min(reserved, Math.max(0, actual));
   if (refund <= 0) return;
   const { allDoc, ipDoc } = counters(day, ip);
   const batch = db.batch();
   batch.set(allDoc, { usd: FieldValue.increment(-refund) }, { merge: true });
   batch.set(ipDoc, { usd: FieldValue.increment(-refund) }, { merge: true });
+  if (guest.id) {
+    const back = guest.ask.kind === 'voice' ? guestTake({ kind: 'voice', usd: refund }, -1) : actual <= 0 ? guestTake(guest.ask, -1) : null;
+    if (back) batch.set(guestDoc(guest.id), back, { merge: true });
+  }
   await batch.commit();
 }
 
@@ -246,7 +285,13 @@ async function status(req: Request, res: Response): Promise<void> {
   const settings = await readSettings();
   const ip = callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip);
   const day = dayKey();
-  const [spent, keys] = await Promise.all([readSpent(day, ip), demoKeys(settings.keyUid)]);
+  const guestId = guestIdOf(req.query?.guest);
+  const [spent, keys, guest, grant] = await Promise.all([
+    readSpent(day, ip),
+    demoKeys(settings.keyUid),
+    guestId ? guestDoc(guestId).get() : null,
+    grantUsd().catch(() => null),
+  ]);
   const today = await readToday(day, spent.all);
   // Available while a cent is left; a beat whose worst case no longer fits is refused on its own.
   const verdict = keys.google ? checkRpgDemo(settings, spent, 0.01) : ({ ok: false, reason: 'no-key' } as const);
@@ -259,6 +304,9 @@ async function status(req: Request, res: Response): Promise<void> {
     perIpUsd: settings.perIpUsd,
     dailyUsd: settings.dailyUsd,
     today,
+    // What this browser's guest has left (`GUEST_ALLOWANCE`), and the account's sign-up tank in dollars.
+    guest: guestId ? guestLeft(guestUseOf(guest?.data())) : null,
+    signupUsd: grant,
   });
 }
 
@@ -272,7 +320,7 @@ async function beat(req: Request, res: Response, body: Record<string, unknown>):
   } catch (e) {
     throw new BadRequest(e instanceof BadContext ? e.message : 'Bad context');
   }
-  await generate(req, res, model, beatPrompt(ctx), 1, thinkingOf(body));
+  await generate(req, res, model, beatPrompt(ctx), 1, thinkingOf(body), { id: guestIdOf(body.guest), ask: { kind: 'beat', index: ctx.index } });
 }
 
 /** A new world (`genesis.ts`), at the genesis temperature: from seeds (dice or the player's words), a description, or both. */
@@ -281,7 +329,7 @@ async function world(req: Request, res: Response, body: Record<string, unknown>)
   if (!model) throw new BadRequest('Unknown model');
   const ctx = demoGenesis(body.ctx);
   if (ctx.seeds.length === 0 && !ctx.wish) throw new BadRequest('No seeds');
-  await generate(req, res, model, genesisPrompt(ctx), genesisTemperature(ctx.exotic), thinkingOf(body));
+  await generate(req, res, model, genesisPrompt(ctx), genesisTemperature(ctx.exotic), thinkingOf(body), { id: guestIdOf(body.guest), ask: { kind: 'world' } });
 }
 
 /** How hard the model thinks: `low` when the reader is waiting on the start (`storyteller.ts`'s `quick`). */
@@ -296,7 +344,8 @@ async function generate(
   model: string,
   prompt: string,
   temperature: number,
-  thinking?: 'low' | 'high',
+  thinking: 'low' | 'high' | undefined,
+  guest: Guest,
 ): Promise<void> {
   const reservation = beatReservation(model, prompt.length);
   if (reservation === null) throw new BadRequest('Model has no price');
@@ -304,7 +353,7 @@ async function generate(
   const settings = await readSettings();
   const day = dayKey();
   const ip = callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip);
-  const claimed = await reserve(settings, day, ip, reservation);
+  const claimed = await reserve(settings, day, ip, reservation, guest);
   if (!claimed.ok) {
     res.status(claimed.status).json({ reason: claimed.reason, error: { message: `demo: ${claimed.reason}` } });
     return;
@@ -420,7 +469,7 @@ async function generate(
     await demoLog(200, 'text/event-stream', Buffer.concat(kept), total, spent, servedBy ?? model, usage);
     res.end();
   } finally {
-    await settle(day, ip, reservation, spent).catch((e) => reportError('rpgDemo.settle', e));
+    await settle(day, ip, reservation, spent, guest).catch((e) => reportError('rpgDemo.settle', e));
   }
 }
 
@@ -517,7 +566,8 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
   const settings = await readSettings();
   const day = dayKey();
   const ip = callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip);
-  const claimed = await reserve(settings, day, ip, cost);
+  const guest: Guest = { id: guestIdOf(body.guest), ask: { kind: 'voice', usd: cost } };
+  const claimed = await reserve(settings, day, ip, cost, guest);
   if (!claimed.ok) {
     res.status(claimed.status).json({ reason: claimed.reason, detail: { message: `demo: ${claimed.reason}` } });
     return;
@@ -611,7 +661,7 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
     res.set('x-demo-remaining', JSON.stringify(remainingUsd(settings, claimed.spent)));
     res.send(audio);
   } finally {
-    await settle(day, ip, cost, spent).catch((e) => reportError('rpgDemo.settle', e));
+    await settle(day, ip, cost, spent, guest).catch((e) => reportError('rpgDemo.settle', e));
   }
 }
 

@@ -16,7 +16,7 @@ import React, { Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffec
 import { useAccountKeys } from '../../hooks/useAccountKeys';
 import { ACCOUNT_KEY, setGatewayContext } from '../../utils/rpg/gateway';
 import { useDieselWallet } from '../../hooks/useDieselWallet';
-import { fuelKeys } from '../../utils/rpg/wallet';
+import { DEFAULT_GRANT_USD, fuelKeys } from '../../utils/rpg/wallet';
 import { useAuth } from '../../hooks/useAuth';
 import { describeError, log } from '../../lib/logger';
 import { addToChronicle, clearChronicle, loadChronicle } from '../../utils/rpg/chronicle';
@@ -108,7 +108,7 @@ import { rememberTiming, type Task } from '../../utils/rpg/progress';
 import { moving, rigsOfStart } from '../../utils/rpg/rigging';
 import { clearGame, deadInSave, loadGame, loadGameFor, mendSave, saveGame, type SavedGame } from '../../utils/rpg/save';
 import { cleanSlate, fetchWorld, questsInProgress, startSync } from '../../utils/rpg/cloud';
-import { setProfile } from '../../utils/rpg/profile';
+import { adoptGuestGame, setProfile } from '../../utils/rpg/profile';
 import { LANGUAGES, guessLang, nativeName, startingLang, storeLangChoice } from '../../utils/rpg/language';
 import { pushLangChoice, syncLangChoice } from '../../utils/rpg/langSync';
 import { countSpend, flushStats, reportLaunch, reportPlay } from '../../utils/rpg/stats';
@@ -253,6 +253,8 @@ interface Ending {
 interface Written {
   beat: Beat | null;
   failure: string | null;
+  /** The guest's one world and first beat are spent: the answer is an invitation to make an account. */
+  invite?: boolean;
 }
 
 declare global {
@@ -697,6 +699,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     opening: boolean;
     /** It is the world that could not be invented, not a beat. */
     world?: boolean;
+    /** The guest's allowance is spent: make an account instead of trying again. */
+    invite?: boolean;
     retry: () => void;
     giveUp: () => void;
   } | null>(null);
@@ -805,7 +809,11 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // switches the store and reads the intro again. Declared before the sync, so it runs first; while
   // auth is still checking, the store stays the one the last page load left (`rpg-profile`).
   useEffect(() => {
-    if (auth.loading || !setProfile(uid)) return;
+    if (auth.loading) return;
+    // A guest who makes an account plays on in the world they made (`adoptGuestGame`).
+    const adopted = uid !== null && adoptGuestGame(uid);
+    if (adopted) log.info('rpg.guest.adopted');
+    if (!setProfile(uid) && !adopted) return;
     if (startedRef.current) stalePullRef.current = true;
     else reloadIntro();
   }, [uid, auth.loading, reloadIntro]);
@@ -1105,7 +1113,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         addGenerationTime(attempt.ms);
         recordQuest(uidRef.current, attempt, gameLang, chosen);
         if (attempt.beat) return { beat: attempt.beat, failure: null };
-        if (attempt.refusal) return { beat: null, failure: tRef.current.demoClosed(attempt.refusal) };
+        if (attempt.refusal) return { beat: null, failure: tRef.current.demoClosed(attempt.refusal), invite: attempt.refusal === 'guest-done' };
         return { beat: null, failure: attempt.outcome === 'no-key' ? null : (attempt.error ?? attempt.outcome) };
       } catch (e) {
         log.error('rpg.beat.crashed', describeError(e));
@@ -1240,7 +1248,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     const writeOpening = async (): Promise<void> => {
       setGenerating(true);
       writingSinceRef.current = Date.now();
-      const { beat: opening, failure } = await writeBeat(0, null, [], null);
+      const { beat: opening, failure, invite } = await writeBeat(0, null, [], null);
       if (token !== questTokenRef.current) return;
       setGenerating(false);
       if (opening) {
@@ -1263,8 +1271,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       // Said on screen, with the provider's own reason: "always the drowners" with no explanation
       // is how the first version failed.
       setStalled({
-        failure: failure.slice(0, 160),
+        failure: failure.slice(0, 200),
         opening: true,
+        invite,
         retry: () => {
           setStalled(null);
           void writeOpening();
@@ -1535,9 +1544,10 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       : (attempt?.error ?? attempt?.outcome ?? 'crashed');
     stopIntro();
     setStalled({
-      failure: failure.slice(0, 160),
+      failure: failure.slice(0, 200),
       opening: true,
       world: true,
+      invite: attempt?.refusal === 'guest-done',
       retry: () => {
         setStalled(null);
         void createWorldRef.current({ ...pending, at: Date.now() });
@@ -2171,7 +2181,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     async (b: Beat, d: Decision, steps: StepRecord[]) => {
       const token = questTokenRef.current;
       setUnfolding(true);
-      const { beat: next, failure } = (await pendingRef.current) ?? { beat: null, failure: 'nothing was asked' };
+      const { beat: next, failure, invite } = (await pendingRef.current) ?? { beat: null, failure: 'nothing was asked' };
       if (token !== questTokenRef.current) return;
       pendingRef.current = null;
       setUnfolding(false);
@@ -2180,10 +2190,11 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         return;
       }
       // Asked again on the reader's word, or ended on the decision the hunter made, not on an error.
-      const reason = (failure ?? '').slice(0, 160);
+      const reason = (failure ?? '').slice(0, 200);
       setStalled({
         failure: reason,
         opening: false,
+        invite,
         retry: () => {
           setStalled(null);
           pendingRef.current = writeBeatRef.current(b.index + 1, d.next, steps, b.title);
@@ -3105,14 +3116,16 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       {opts.sub && <small>{opts.sub}</small>}
     </button>
   );
-  // The demo's budget for today, said in litres of diesel (`DieselPlant.tsx`, `diesel.ts`).
-  // A spent cap closes the demo (`available: false`), which is exactly when the dark plant must show.
-  // Signed in on the server's keys, it is the account's own tank instead (`wallet.ts`).
+  // The account's tank, in litres of diesel (`DieselPlant.tsx`, `diesel.ts`, `wallet.ts`). Only an
+  // account has one (owner, 23 Nov 2026): a guest is not on diesel but on its one world and first beat
+  // (`GUEST_ALLOWANCE`), and is invited to make an account, whose sign-up bonus is the first tank.
   const diesel = onDiesel
     ? { litres: litres(wallet!.balanceUsd), capacity: litres(Math.max(wallet!.grantUsd, wallet!.balanceUsd)), tank: true }
-    : demo && (storyProvider === 'demo' || (storyProvider === 'static' && (demo.reason === 'ip-cap' || demo.reason === 'all-cap')))
-      ? { litres: litres(Math.min(demo.remaining.ip, demo.remaining.all)), capacity: litres(demo.perIpUsd), tank: false }
-      : null;
+    : null;
+  /** The sign-up bonus, said in litres, for the invitation; the default when the function has not said. */
+  const signupLitres = formatLitres(litres(demo?.signupUsd ?? DEFAULT_GRANT_USD), gameLang);
+  /** The guest's one world and first beat are both used (known only once the function has said). */
+  const guestSpent = Boolean(demo?.guest && demo.guest.worlds <= 0 && demo.guest.beats <= 0);
   // Anyone on their own tank buys canisters through Paddle (`paddleCheckout.ts`); the webhook pours
   // the litres and the same snapshot raises the gauge. Loaded on the first buy, not with the game.
   const buyDiesel =
@@ -3198,6 +3211,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
             </a>,
             <a key="signup" className="rpg-menu-item" href={`${accountRoot}login/?mode=up`}>
               <span>{t.menuSignUp}</span>
+              <small>{t.signupBonus(signupLitres)}</small>
             </a>,
           ];
   const homeSheet = (
@@ -3450,7 +3464,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                       : storyProvider === 'static'
                         ? t.staticQuest
                         : storyProvider === 'demo' && demo
-                          ? t.demoQuest(formatLitres(diesel?.litres ?? 0, gameLang), formatLitres(diesel?.capacity ?? 0, gameLang))
+                          ? guestSpent
+                            ? `${t.demoClosedGuest} ${t.signupBonus(signupLitres)}`
+                            : t.demoQuest(signupLitres)
                           : t.aiQuest(storyProvider)}
                 </li>
                 {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
@@ -3693,13 +3709,23 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           )}
 
           {stalled && !dialogue && !ending && (
-            <div className="rpg-stalled" role="alertdialog" aria-label={stalled.world ? t.worldFailedTitle : t.stalledTitle}>
-              <div className="rpg-notice-title">✗ {stalled.world ? t.worldFailedTitle : t.stalledTitle}</div>
+            <div className="rpg-stalled" role="alertdialog" aria-label={stalled.invite ? t.guestDoneTitle : stalled.world ? t.worldFailedTitle : t.stalledTitle}>
+              <div className="rpg-notice-title">{stalled.invite ? `★ ${t.guestDoneTitle}` : `✗ ${stalled.world ? t.worldFailedTitle : t.stalledTitle}`}</div>
               <p className="rpg-stalled-why">{stalled.failure}</p>
+              {stalled.invite && <p className="rpg-stalled-why">{t.signupBonus(signupLitres)}</p>}
               <div className="rpg-stalled-actions">
-                <button type="button" className="rpg-start" onClick={stalled.retry}>
-                  ↻ {t.retry}
-                </button>
+                {stalled.invite ? (
+                  <>
+                    <a className="rpg-start" href={`${accountRoot}login/?mode=up`}>
+                      {t.menuSignUp}
+                    </a>
+                    <a href={`${accountRoot}login/`}>{t.menuSignIn}</a>
+                  </>
+                ) : (
+                  <button type="button" className="rpg-start" onClick={stalled.retry}>
+                    ↻ {t.retry}
+                  </button>
+                )}
                 <button type="button" onClick={stalled.giveUp}>
                   {stalled.world ? t.playClassic : stalled.opening ? t.playStatic : t.endHere}
                 </button>

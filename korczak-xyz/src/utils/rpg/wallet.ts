@@ -34,8 +34,11 @@ export const GRANTED_FIELD = 'dieselGrantedAt';
 /** The panel's diesel settings: `rpgDiesel/config`, no Firestore rule (Admin SDK only). */
 export const DIESEL_CONFIG_DOC = ['rpgDiesel', 'config'] as const;
 
-/** What a new account finds in its tank unless the panel says otherwise: 100 L, about one world played through. */
-export const DEFAULT_GRANT_USD = 1;
+/**
+ * What a new account finds in its tank unless the panel says otherwise: the sign-up bonus, 400 L (owner,
+ * 23 Nov 2026; it was 100 L). Poured once — nothing refills it for free, not monthly, not daily.
+ */
+export const DEFAULT_GRANT_USD = 4;
 /** The most the panel may set as the first tank, and the most one top-up may add. */
 export const MAX_GRANT_USD = 20;
 export const MAX_TOPUP_USD = 100;

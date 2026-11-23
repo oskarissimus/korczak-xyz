@@ -108,9 +108,16 @@ function response() {
   return res;
 }
 
-function request(method: string, body?: unknown, ip = '203.0.113.7'): any {
-  return { method, body, ip, headers: { origin: 'https://korczak.xyz', 'x-forwarded-for': ip } };
+let guests = 0;
+/** A POST names a new guest unless it names its own (`guest`), as a fresh browser would. */
+function request(method: string, body?: unknown, ip = '203.0.113.7', query: Record<string, string> = {}): any {
+  const named =
+    body && typeof body === 'object' && !('guest' in body) ? { ...body, guest: `guest-test-${String(++guests).padStart(10, '0')}` } : body;
+  return { method, body: named, ip, query, headers: { origin: 'https://korczak.xyz', 'x-forwarded-for': ip } };
 }
+
+/** A guest who has had their world and beat already, so a clip of theirs may be spoken. */
+const SPEAKER = 'guest-speaker-000000001';
 
 function sse(usage: { promptTokenCount: number; candidatesTokenCount: number; thoughtsTokenCount: number }) {
   const events = [
@@ -135,6 +142,7 @@ beforeEach(() => {
   store.clear();
   store.set('demo/config', { enabled: true, keyUid: 'owner', apps: { roaster: true } });
   store.set('users/owner/keys/config', { apiKeys: { google: 'AIza-owner-0000000000', elevenLabs: 'sk_owner-0000000000' } });
+  store.set(`demoGuests/${SPEAKER}`, { worlds: 1, beats: 1 });
 });
 
 afterEach(() => {
@@ -232,7 +240,7 @@ describe('rpgDemo', () => {
     const fetch = vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
     vi.stubGlobal('fetch', fetch);
     const res = response();
-    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Hunter.', voice: 'female', lang: 'pl' }), res);
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Hunter.', voice: 'female', lang: 'pl', guest: SPEAKER }), res);
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('audio/mpeg');
     expect(fetch.mock.calls[0][1].headers['xi-api-key']).toBe('sk_owner-0000000000');
@@ -241,7 +249,7 @@ describe('rpgDemo', () => {
     expect(JSON.parse(fetch.mock.calls[0][1].body).model_id).toBe('eleven_flash_v2_5');
 
     const long = response();
-    await handleRpgDemo(request('POST', { kind: 'voice', text: 'x'.repeat(401), voice: 'female', lang: 'pl' }), long);
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'x'.repeat(401), voice: 'female', lang: 'pl', guest: SPEAKER }), long);
     expect(long.statusCode).toBe(400);
   });
 
@@ -249,7 +257,7 @@ describe('rpgDemo', () => {
     const fetch = vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
     vi.stubGlobal('fetch', fetch);
     const res = response();
-    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Pył. [Kaszel].', voice: 'female', lang: 'pl' }), res);
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Pył. [Kaszel].', voice: 'female', lang: 'pl', guest: SPEAKER }), res);
     expect(res.statusCode).toBe(200);
     expect(res.headers['x-demo-model']).toBe('eleven_v4');
     expect(fetch.mock.calls[0][0]).toContain('/v1/text-to-dialogue');
@@ -262,7 +270,7 @@ describe('rpgDemo', () => {
       .mockResolvedValueOnce(new Response('{}', { status: 422 }))
       .mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
     const refused = response();
-    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Ja... (kaszle) Dobrze!', voice: 'male', lang: 'pl' }), refused);
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Ja... (kaszle) Dobrze!', voice: 'male', lang: 'pl', guest: SPEAKER }), refused);
     expect(refused.statusCode).toBe(200);
     expect(refused.headers['x-demo-model']).toBe('eleven_flash_v2_5');
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ model_id: 'eleven_flash_v2_5', text: 'Ja... Dobrze!' });
@@ -333,5 +341,82 @@ describe('rpgDemo', () => {
     const res = response();
     await handleRpgDemo(request('GET'), res);
     expect(res.body).toMatchObject({ available: false, reason: 'app-off' });
+  });
+  describe("a guest's allowance: one world and the first beat of one quest", () => {
+    const world = { lang: 'en', seeds: ['salt', 'grief'] };
+    const ok = () => sse({ promptTokenCount: 100, candidatesTokenCount: 100, thoughtsTokenCount: 0 });
+
+    it('gives one world and one first beat, then refuses as spent — never refilled', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => ok()));
+      const guest = 'guest-allowance-0000001';
+      const go = async (body: Record<string, unknown>) => {
+        const res = response();
+        await handleRpgDemo(request('POST', { ...body, guest }), res);
+        return res;
+      };
+      expect((await go({ kind: 'world', model: 'gemini-flash-latest', ctx: world })).statusCode).toBe(200);
+      const again = await go({ kind: 'world', model: 'gemini-flash-latest', ctx: world });
+      expect(again.statusCode).toBe(402);
+      expect(again.body).toMatchObject({ reason: 'guest-done' });
+      // A later step of a quest is never the guest's, even with the beat unused.
+      expect((await go({ kind: 'beat', model: 'gemini-flash-latest', ctx: { ...ctx, index: 1, job: { kind: 'slay', count: 1 } } })).body).toMatchObject({ reason: 'guest-done' });
+      expect((await go({ kind: 'beat', model: 'gemini-flash-latest', ctx })).statusCode).toBe(200);
+      expect((await go({ kind: 'beat', model: 'gemini-flash-latest', ctx })).body).toMatchObject({ reason: 'guest-done' });
+      expect(store.get(`demoGuests/${guest}`)).toMatchObject({ worlds: 1, beats: 1 });
+
+      const status = response();
+      await handleRpgDemo(request('GET', undefined, '203.0.113.7', { guest }), status);
+      expect(status.body).toMatchObject({ available: true, guest: { worlds: 0, beats: 0 } });
+    });
+
+    it('gives the go back when Google refuses, so the next model can have it', async () => {
+      const fetch = vi.fn().mockResolvedValueOnce(new Response('{}', { status: 503 })).mockImplementation(async () => ok());
+      vi.stubGlobal('fetch', fetch);
+      const guest = 'guest-allowance-0000002';
+      const first = response();
+      await handleRpgDemo(request('POST', { kind: 'world', model: 'gemini-flash-latest', ctx: world, guest }), first);
+      expect(first.statusCode).toBe(503);
+      expect(store.get(`demoGuests/${guest}`)).toMatchObject({ worlds: 0 });
+      const second = response();
+      await handleRpgDemo(request('POST', { kind: 'world', model: 'gemini-flash-lite-latest', ctx: world, guest }), second);
+      expect(second.statusCode).toBe(200);
+    });
+
+    it('names no guest: refused as spent, nothing asked', async () => {
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      const res = response();
+      await handleRpgDemo(request('POST', { kind: 'beat', model: 'gemini-flash-latest', ctx, guest: 'short' }), res);
+      expect(res.statusCode).toBe(402);
+      expect(res.body).toMatchObject({ reason: 'guest-done' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('speaks only for a guest who has had something to speak, within its dollars', async () => {
+      const fetch = vi.fn().mockImplementation(async () => new Response(new Uint8Array([1]), { status: 200 }));
+      vi.stubGlobal('fetch', fetch);
+      const fresh = response();
+      await handleRpgDemo(request('POST', { kind: 'voice', text: 'Hunter.', voice: 'female', lang: 'en' }), fresh);
+      expect(fresh.body).toMatchObject({ reason: 'guest-done' });
+      store.set(`demoGuests/${SPEAKER}`, { worlds: 1, beats: 1, voiceUsd: 0.3 });
+      const spentUp = response();
+      await handleRpgDemo(request('POST', { kind: 'voice', text: 'Hunter.', voice: 'female', lang: 'en', guest: SPEAKER }), spentUp);
+      expect(spentUp.body).toMatchObject({ reason: 'guest-done' });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('lets one address start three new guests a day, so a cleared browser is not a free tank', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => ok()));
+      const codes: number[] = [];
+      for (let i = 0; i < 4; i++) {
+        const res = response();
+        await handleRpgDemo(request('POST', { kind: 'world', model: 'gemini-flash-latest', ctx: world }, '192.0.2.44'), res);
+        codes.push(res.statusCode);
+      }
+      expect(codes).toEqual([200, 200, 200, 402]);
+      const elsewhere = response();
+      await handleRpgDemo(request('POST', { kind: 'world', model: 'gemini-flash-latest', ctx: world }, '192.0.2.45'), elsewhere);
+      expect(elsewhere.statusCode).toBe(200);
+    });
   });
 });

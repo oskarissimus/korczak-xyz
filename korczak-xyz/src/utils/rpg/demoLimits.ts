@@ -107,7 +107,63 @@ export function normalizeRpgDemo(value: unknown): RpgDemoSettings {
   };
 }
 
-export type RpgDemoReason = 'disabled' | 'no-key' | 'app-off' | 'ip-cap' | 'all-cap';
+export type RpgDemoReason = 'disabled' | 'no-key' | 'app-off' | 'ip-cap' | 'all-cap' | 'guest-done';
+
+/**
+ * A guest's whole allowance (owner, 23 Nov 2026: "enough for a guest to generate one world and one
+ * quest — its first beat — as a mechanism of its own, not diesel; an account gets a 400 L sign-up
+ * bonus; a free monthly refill I cannot afford"). Counted per browser (`demo.ts`'s guest id) on the
+ * server, in `demoGuests/{id}`, and never refilled: no day, no midnight. Only an answer that streamed
+ * counts — a refusal from Google gives the go back. The voice of those two answers is bounded in
+ * dollars, since a clip is asked line by line.
+ */
+export const GUEST_ALLOWANCE = { worlds: 1, beats: 1, voiceUsd: 0.3 } as const;
+/**
+ * New guests one address may start in a Warsaw day: clearing the browser mints a new guest id, so the
+ * address is what stops that being a free tap, and three keeps a shared address (a household, a
+ * carrier's NAT) from shutting everybody behind it out after the first.
+ */
+export const GUESTS_PER_IP_DAY = 3;
+
+/** A guest id as `demo.ts` mints it: anything else is no guest. */
+export function guestIdOf(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(value) ? value : null;
+}
+
+export interface GuestUse {
+  worlds: number;
+  beats: number;
+  voiceUsd: number;
+}
+
+export function guestUseOf(data: Record<string, unknown> | undefined): GuestUse {
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+  return { worlds: n(data?.worlds), beats: n(data?.beats), voiceUsd: n(data?.voiceUsd) };
+}
+
+/** What a guest has left: worlds and beats as counts, the voice in dollars. */
+export function guestLeft(use: GuestUse): GuestUse {
+  return {
+    worlds: Math.max(0, GUEST_ALLOWANCE.worlds - use.worlds),
+    beats: Math.max(0, GUEST_ALLOWANCE.beats - use.beats),
+    voiceUsd: Math.max(0, GUEST_ALLOWANCE.voiceUsd - use.voiceUsd),
+  };
+}
+
+export type GuestAsk = { kind: 'world' } | { kind: 'beat'; index: number } | { kind: 'voice'; usd: number };
+
+/**
+ * Whether a guest may have this. A beat is the first of a quest only (index 0); a clip only once the
+ * guest has had a world or a beat to speak, and within the voice's dollars. `fresh` is a guest the
+ * server has never seen, and `ipGuests` how many new ones this address has started today.
+ */
+export function guestMay(use: GuestUse, ask: GuestAsk, fresh: boolean, ipGuests: number): boolean {
+  if (fresh && ipGuests >= GUESTS_PER_IP_DAY) return false;
+  const left = guestLeft(use);
+  if (ask.kind === 'world') return left.worlds > 0;
+  if (ask.kind === 'beat') return ask.index === 0 && left.beats > 0;
+  return use.worlds + use.beats > 0 && ask.usd <= left.voiceUsd;
+}
 
 export type RpgDemoVerdict = { ok: true } | { ok: false; reason: RpgDemoReason; status: number };
 

@@ -627,12 +627,22 @@
   justify-content: center;
 }
 
-.rpg-stalled-actions button {
+.rpg-stalled-actions button,
+.rpg-stalled-actions a {
   min-height: 44px;
   margin: 0;
 }
 
-.rpg-stalled-actions button:not(.rpg-start) {
+/* The guest's invitation: sign-up and sign-in are links to their pages, drawn as the buttons. */
+.rpg-stalled-actions a {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+.rpg-stalled-actions button:not(.rpg-start),
+.rpg-stalled-actions a:not(.rpg-start) {
   padding: 6px 12px;
   border: 1px solid #6b5b3e;
   background: rgba(0, 0, 0, 0.5);

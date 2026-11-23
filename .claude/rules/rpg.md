@@ -1863,6 +1863,38 @@ before its usage arrived keeps the whole reservation, which errs the owner's way
 
 The two caps and the RPG's switch are set on the game's admin panel (*The admin panel*, below).
 
+### A guest gets one world and one first beat, not diesel
+
+Owner, 23 Nov 2026: "enough for a guest to generate one world and one quest (its first beat) — a
+mechanism of its own, not diesel; an account gets a 400 L sign-up bonus; a free monthly refill I
+cannot afford". Until then a guest had the demo's per-address day shown as 400 L of diesel, poured
+again every midnight — a free daily tank for anyone without an account.
+
+- **The allowance is a count, on the server** (`GUEST_ALLOWANCE` in `demoLimits.ts`): one
+  `{kind:'world'}`, one `{kind:'beat'}` at `index` 0, and $0.30 of clips for their lines, per guest,
+  **never refilled**. It lives in `demoGuests/{guest id}` (`worlds`, `beats`, `voiceUsd`; Admin SDK
+  only, no rule), checked and taken in the same transaction as the dollar caps (`reserve` in
+  `handler.ts`). A clip is spoken only for a guest who has had a world or a beat.
+- **The guest id is the browser's** (`guestId` in `demo.ts`, localStorage `rpg-guest`, 32 random hex
+  characters), sent with every world, beat and clip, and as `?guest=` on the status GET. A request
+  naming no valid id is refused as spent. Clearing the browser mints a new guest, so an address may
+  start only `GUESTS_PER_IP_DAY` (3) new guests a Warsaw day (`guests` on the day's `ips/{hash}`) —
+  three, not one, so a household or a carrier's NAT is not shut out by its first player.
+- **Only an answer that streamed counts.** A refusal from Google (any non-2xx) gives the go back in
+  `settle`, so the next model in the chain can have it; a stream cut before its usage keeps it, as it
+  keeps the dollars. An unplayable answer still counts — the server cannot tell.
+- **Spent is a 402 with `reason: 'guest-done'`**, which `tryNext` does not move on from (no model
+  fits a count). The game draws it as an invitation, not a failure: the stalled card is titled *Play on
+  with an account*, says the sign-up bonus (`signupUsd` from the status, i.e. `rpgDiesel/config`), and
+  offers *Create account* and *Sign in* instead of *Try again*. The settings line and the home sheet's
+  *Create account* say the bonus too.
+- **The guest's game goes with them** (`adoptGuestGame` in `profile.ts`): the first account signed
+  in on this browser after the guest played, if it has nothing here yet, gets a copy of the guest's
+  worlds, atlas, chronicle and saves (once per browser, `rpg-guest-adopted`), and the sync sends them
+  up. So the quest the invitation interrupted continues on the account's tank.
+- **The dollar caps stay behind it** as the backstop (`rpgPerIpUsd`, `rpgDailyUsd`), far above what a
+  guest can spend; they are no longer shown anywhere as litres.
+
 ## The admin panel
 
 Owner, 9 Nov 2026: "an admin panel in the game, so I can set the keys for now — later other things
@@ -1891,7 +1923,7 @@ for an admin) and the last section of `/apps/admin/` on korczak.xyz: one compone
   token — because a model list answers just as happily for an account with no money. The answer is a
   status and a few words per key, never the key. Nothing else can check them: the keys have no rule and
   no page or coding session reads them back.
-- **Diesel**: the first tank a new account gets (`rpgDiesel/config.grantUsd`, default $1 = 100 L, at
+- **Diesel**: the first tank a new account gets (`rpgDiesel/config.grantUsd`, default $4 = 400 L since 23 Nov 2026, the sign-up bonus — it was $1, at
   most $20) and a top-up of one account by its e-mail (`topUp`, at most $100 a go) — how the owner
   pours diesel in by hand (a gift, a fix); canisters are bought through Paddle (*Buying diesel*).
 - **The demo section** writes `apps.rpg`, `rpgPerIpUsd`, `rpgDailyUsd` into `demo/config` merged, so
@@ -2024,7 +2056,8 @@ the price of a world or a beat is in it too."
   worst case) it is dark and still and the canisters come up. Going from empty to anything (the
   midnight refill, later a purchase), the man walks in, pours (3.6 s, `REFUEL_MS` = the CSS
   keyframes), and only then do the lights come on.
-- **Where it shows**, only for a reader on the demo: the canister badge on the main menu (the plant
+- **Where it shows**, only for an account on its tank (since 23 Nov 2026 a guest has no diesel —
+  *A guest gets one world and one first beat*, above; until then all of this was the demo's day): the canister badge on the main menu (the plant
   itself when empty), the panel behind the badge with the prices, the badge and a price tag on
   New world, a price tag on New quest, the line in Settings, and the plant on the ending screen. A
   spent cap closes the demo (`available: false`, so the story falls back to `static`), and that is
@@ -2053,8 +2086,8 @@ the price of a world or a beat is in it too."
   (`dsc_01m7x7s5kc02qsr6n5mz2rv9mr`): the Barrel free, 20 uses.
 - **On an account it is the account's tank** (*Signed in, the tank pays*, below); everything above is
   the demo's day for a reader signed in to nothing.
-- **On the demo a canister is still a preview**: there is no account to pour into, so a tap plays the
-  refuelling, says to sign in to buy, and goes back to the real day.
+- **No guest sees a canister** any more; the preview a guest's tap used to play (`DieselPlant` without
+  `tank`) is unused, kept in the component.
 
 ### Buying diesel (Paddle)
 
@@ -2169,7 +2202,10 @@ running total the ledger already kept (`utils/rpg/wallet.ts`, `functions/src/rpg
 - **Signed in, diesel is the gate**: an empty tank gives the hand-written quest, not the demo. The demo
   stays for readers signed in to nothing.
 - **The first tank is granted once** (`dieselGrantedAt`), on `/wallet` or the first paid request;
-  emptying it never refills it. Sign-up sends no verification mail, so a grant can be farmed with new
+  emptying it never refills it, and nothing free ever does — no monthly or daily delivery (owner, 23
+  Nov 2026: "I cannot afford it"); litres beyond it are bought (Paddle, the friends' discount codes
+  included) or poured by hand from the panel. Accounts granted before the bonus went to 400 L keep
+  the 100 L tank they got and what is left of it: nothing granted is taken back, nothing topped up. Sign-up sends no verification mail, so a grant can be farmed with new
   addresses — the same exposure as the demo's per-address day, and why the grant is small.
 - **The gauge is live**: `/wallet` (granting, and which server keys exist), then `onSnapshot` on
   `rpgLedger/{uid}` — the one ledger document the owner may read (`firestore.rules`). The plant, the

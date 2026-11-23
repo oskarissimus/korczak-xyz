@@ -173,6 +173,7 @@
 :root:root .rpg-library-foot button,
 :root:root .rpg-trash-sweep > button,
 :root:root .rpg-stalled-actions button:not(.rpg-start),
+:root:root .rpg-stalled-actions a:not(.rpg-start),
 :root:root .rpg-dz-offer,
 :root:root .rpg-dz-badge,
 :root:root .retro-btn {

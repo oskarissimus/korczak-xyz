@@ -4,7 +4,7 @@
  * the reservation are in `utils/rpg/wallet.ts`; this file is the Firestore half.
  *
  * - **The first tank is granted once**, the first time the account asks (`/wallet`, or its first
- *   request on diesel): `grantUsd` from `rpgDiesel/config` (the panel), 100 L by default.
+ *   request on diesel): `grantUsd` from `rpgDiesel/config` (the panel), 400 L by default: the sign-up bonus.
  *   `dieselGrantedAt` marks it, so emptying the tank never refills it.
  * - **Every request reserves its worst case** in a transaction and is settled afterwards at what it
  *   cost — the demo's scheme (`handler.ts`), against one account instead of an address and the day.

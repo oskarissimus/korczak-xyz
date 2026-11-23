@@ -63,3 +63,30 @@ export function withProfile<T>(uid: string | null, fn: () => T): T {
     active = before;
   }
 }
+
+/** The guest's game a new account takes with it: its worlds, their atlases and chronicle, the quest in progress. */
+const ADOPTED = ['rpg-worlds', 'rpg-atlas', 'rpg-saves', 'rpg-chronicle'] as const;
+const ADOPTED_KEY = 'rpg-guest-adopted';
+
+/**
+ * The guest's world and quest go with them into the account they make (owner, 23 Nov 2026: a guest
+ * has one world and the first step of one quest, then is invited to make an account and play on).
+ * Copied once per browser, to the first account signed in here after the guest played, and only into
+ * an account that has nothing in this browser yet; the sync (`cloud.ts`) then sends it up like any
+ * unsynced change. The guest's own copy stays where it was. True when something was copied.
+ */
+export function adoptGuestGame(uid: string): boolean {
+  try {
+    if (localStorage.getItem(ADOPTED_KEY)) return false;
+    if (!localStorage.getItem('rpg-worlds')) return false;
+    if (ADOPTED.some((base) => localStorage.getItem(`${base}@${uid}`) !== null)) return false;
+    for (const base of ADOPTED) {
+      const value = localStorage.getItem(base);
+      if (value !== null) localStorage.setItem(`${base}@${uid}`, value);
+    }
+    localStorage.setItem(ADOPTED_KEY, uid);
+    return true;
+  } catch {
+    return false;
+  }
+}

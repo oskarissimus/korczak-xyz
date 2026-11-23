@@ -9,7 +9,7 @@
  */
 
 import { apiFetch, serverCost } from './gateway';
-import { DEMO_VOICE_KEY, rpgDemoUrl } from './demo';
+import { DEMO_VOICE_KEY, guestId, rpgDemoUrl } from './demo';
 import { findVoice, sharedVoicesOf, voiceListsOf, type SharedVoice, type VoiceLists, type VoiceWho } from './voicePick';
 import { endRequest, startRequest, updateRequest, voiceCredits } from './devlog';
 import { outOfFunds } from './funds';
@@ -294,7 +294,7 @@ async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<str
       ? await fetch(demoUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ kind: 'voice', text: line.text, voice: line.voice, who: line.who, lang }),
+          body: JSON.stringify({ kind: 'voice', text: line.text, voice: line.voice, who: line.who, lang, guest: guestId() }),
         })
       : await ownClip(key, line, lang, said);
     if (!demoUrl && !response.ok && said.model === TAG_MODEL && refusedModel(response.status)) {

@@ -34,9 +34,9 @@ describe('diesel as a balance', () => {
     expect(balanceOf({ usd: 3 })).toBeNull();
     expect(balanceOf({ dieselGrantedAt: 1, dieselUsd: -0.001 })).toBe(0);
     expect(balanceOf({ dieselGrantedAt: 1, dieselUsd: 0.42 })).toBe(0.42);
-    expect(grantOf(undefined)).toBe(1);
+    expect(grantOf(undefined)).toBe(4);
     expect(grantOf({ grantUsd: 2.5 })).toBe(2.5);
-    expect(grantOf({ grantUsd: 1e6 })).toBe(1);
+    expect(grantOf({ grantUsd: 1e6 })).toBe(4);
   });
 
   it('fills only the keys the reader lacks and the server has', () => {

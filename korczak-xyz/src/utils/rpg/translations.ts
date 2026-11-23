@@ -57,12 +57,21 @@ const en = {
   readingKeys: 'Reading your API keys from the account…',
   voiceOn: 'Voice: ElevenLabs, on your key.',
   voiceOff: 'Voice: none, there is no ElevenLabs key.',
-  demoQuest: (left: string, cap: string) =>
-    `Story: written by Gemini on the demo, no key or account needed. ${left} of today's ${cap} of diesel left for you.`,
+  demoQuest: (signup: string) =>
+    `Story: written by Gemini, no key or account needed: as a guest you get one world and the first step of one quest. An account starts with ${signup} of diesel.`,
   demoVoice: 'Voice: ElevenLabs, on the demo.',
   demoClosed(reason: RpgDemoReason): string {
-    return reason === 'ip-cap' ? this.demoClosedIp : reason === 'all-cap' ? this.demoClosedAll : this.demoClosedOff;
+    return reason === 'guest-done'
+      ? this.demoClosedGuest
+      : reason === 'ip-cap'
+        ? this.demoClosedIp
+        : reason === 'all-cap'
+          ? this.demoClosedAll
+          : this.demoClosedOff;
   },
+  demoClosedGuest: 'As a guest you get one world and the first step of one quest, and you have had them. Make an account to play on.',
+  guestDoneTitle: 'Play on with an account',
+  signupBonus: (litres: string) => `${litres} of diesel to start`,
   demoClosedIp: "Today's demo budget for you is spent; it comes back at midnight (Warsaw).",
   demoClosedAll: "Today's demo budget for everybody is spent; it comes back at midnight (Warsaw).",
   demoClosedOff: 'The demo is closed right now.',
@@ -425,12 +434,21 @@ const pl: typeof en = {
   readingKeys: 'Pobieram klucze API z konta…',
   voiceOn: 'Głos: ElevenLabs, na Twoim kluczu.',
   voiceOff: 'Głos: brak, nie ma klucza ElevenLabs.',
-  demoQuest: (left, cap) =>
-    `Fabuła: pisze Gemini w trybie demo, bez klucza i bez konta. Zostało Ci ${left} z dzisiejszych ${cap} dizla.`,
+  demoQuest: (signup) =>
+    `Fabuła: pisze Gemini, bez klucza i bez konta: jako gość masz jeden świat i pierwszy krok jednego questa. Konto zaczyna z ${signup} dizla.`,
   demoVoice: 'Głos: ElevenLabs, w trybie demo.',
   demoClosed(reason: RpgDemoReason): string {
-    return reason === 'ip-cap' ? this.demoClosedIp : reason === 'all-cap' ? this.demoClosedAll : this.demoClosedOff;
+    return reason === 'guest-done'
+      ? this.demoClosedGuest
+      : reason === 'ip-cap'
+        ? this.demoClosedIp
+        : reason === 'all-cap'
+          ? this.demoClosedAll
+          : this.demoClosedOff;
   },
+  demoClosedGuest: 'Jako gość masz jeden świat i pierwszy krok jednego questa i oba są już wykorzystane. Załóż konto, żeby grać dalej.',
+  guestDoneTitle: 'Graj dalej z kontem',
+  signupBonus: (litres) => `${litres} dizla na start`,
   demoClosedIp: 'Twój dzisiejszy budżet demo się skończył; wraca o północy.',
   demoClosedAll: 'Dzisiejszy budżet demo dla wszystkich się skończył; wraca o północy.',
   demoClosedOff: 'Tryb demo jest teraz wyłączony.',
