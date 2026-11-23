@@ -174,7 +174,6 @@ export default function DieselShop({
               <b>{t.dieselSubPrice(SUBSCRIPTION.pln)}</b>
             </span>
             <span className="rpg-dzs-monthly-litres">{t.dieselSubLitres(formatLitres(SUBSCRIPTION.litres, lang))}</span>
-            <small>{t.dieselSubNote}</small>
           </button>
         )}
       </div>

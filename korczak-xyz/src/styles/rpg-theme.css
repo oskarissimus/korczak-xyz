@@ -1915,10 +1915,28 @@
   color: var(--d-ink-strong);
 }
 
-:root:root .rpg-dzs-monthly small {
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--d-ink-dim);
+/* The page's one white thing: the subscription is its call to action (owner, 23 Nov 2026: "a sales
+   page, with a call to action for the subscription, selling canisters"). */
+:root:root .rpg-dzs-offer.rpg-dzs-monthly {
+  padding: 14px 16px;
+  border-color: #fff;
+  background: #fff;
+  color: #0b0b0d;
+}
+
+:root:root .rpg-dzs-offer.rpg-dzs-monthly strong,
+:root:root .rpg-dzs-offer.rpg-dzs-monthly b,
+:root:root .rpg-dzs-offer.rpg-dzs-monthly .rpg-dzs-monthly-litres {
+  color: #0b0b0d;
+}
+
+:root:root .rpg-dzs-offer.rpg-dzs-monthly:hover {
+  border-color: #fff;
+  background: #e8e8ea;
+}
+
+:root:root .rpg-dzs-offer.rpg-dzs-monthly[aria-busy='true'] {
+  box-shadow: 0 0 0 2px #0b0b0d, 0 0 0 4px #fff;
 }
 
 /* The account's subscription, once it has one: its state where the offer was. */
