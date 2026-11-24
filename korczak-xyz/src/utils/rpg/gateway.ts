@@ -31,6 +31,7 @@ import {
 } from './gatewayRoutes';
 import { ACCOUNT_KEY } from '../accountKeys/keys';
 import { ADMIN_PATH, type AdminPatch, type AdminStatus } from './adminConfig';
+import { ADMIN_ACCOUNTS_PATH, PLAYTIME_PATH, type AccountsPage } from './playtime';
 import { ADMIN_WALLETS_PATH, type WalletPatch, type WalletsPage } from './wallets';
 import {
   ADMIN_REQUEST_PATH,
@@ -186,6 +187,31 @@ export function adminRequests(from: number, to: number, signal?: AbortSignal): P
 /** One logged request with what was sent and what came back; admins only. */
 export function adminRequest(id: string, signal?: AbortSignal): Promise<{ entry: RequestLogEntry; bodies: RequestBodies | null }> {
   return adminGet(`${ADMIN_REQUEST_PATH}?id=${encodeURIComponent(id)}`, signal);
+}
+
+/** Every account with its e-mail, its tank and its time in the game (`playtime.ts`); admins only. */
+export function adminAccounts(signal?: AbortSignal): Promise<AccountsPage> {
+  return adminGet<AccountsPage>(ADMIN_ACCOUNTS_PATH, signal);
+}
+
+/**
+ * Hands the gateway the seconds this page was played since its last report (`usePlaytime.ts`).
+ * `keepalive`, so the report sent as the tab goes away still leaves. Never throws.
+ */
+export async function reportPlaytime(seconds: number): Promise<boolean> {
+  try {
+    const token = await idToken();
+    if (!token) return false;
+    const response = await fetch(`${gatewayUrl()}${PLAYTIME_PATH}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ s: Math.round(seconds) }),
+      keepalive: true,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 /** What the gateway says of the account's keys — never a key, only which exist and their last four characters. */

@@ -340,3 +340,45 @@
   margin-top: auto;
   text-decoration: none;
 }
+
+/* The admin's Accounts tab (`AdminAccounts.tsx`): numbers right-aligned in even figures, so a column of
+   times reads down; the totals' row headings are cells, not sticky column heads. */
+.rpg-costs-table .rpg-costs-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rpg-accounts-totals tbody th {
+  position: static;
+  font-weight: normal;
+}
+
+/* Fixed columns, so the totals' "…" and the numbers that replace them take the same room: nothing
+   moves when the answer comes. */
+.rpg-accounts-totals {
+  table-layout: fixed;
+}
+
+.rpg-accounts-totals th:nth-child(1) { width: 24%; }
+.rpg-accounts-totals th:nth-child(2) { width: 18%; }
+.rpg-accounts-totals th:nth-child(3) { width: 22%; }
+.rpg-accounts-totals th:nth-child(4) { width: 36%; }
+
+.rpg-accounts-totals th,
+.rpg-accounts-totals td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rpg-accounts-per {
+  display: block;
+  font-size: 0.85em;
+}
+
+.rpg-accounts-controls {
+  margin: 8px 0;
+}
+
+.rpg-accounts-controls input {
+  min-width: 0;
+}

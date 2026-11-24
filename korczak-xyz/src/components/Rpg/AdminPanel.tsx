@@ -7,7 +7,8 @@
  * `admins/{uid}` itself — this page deciding what to draw is not the boundary. A key typed here is
  * sent once and never comes back: the answer carries its last four characters.
  *
- * The costs — the dashboard, every paid request and the price list — are `AdminCosts.tsx`, mounted last.
+ * The costs — the dashboard, every paid request and the price list — are `AdminCosts.tsx`, mounted last;
+ * the accounts with their time in the game are `AdminAccounts.tsx`.
  *
  * A NEW SECTION is a field in `utils/rpg/adminConfig.ts` (status, patch, parser), a branch in
  * `admin.ts`, and one more `<section>` below that sends `{ <name>: … }` through `save`.
@@ -25,6 +26,7 @@
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
 
 import { useAuth } from '../../hooks/useAuth';
+import AdminAccounts from './AdminAccounts';
 import AdminCosts, { type CostsTab } from './AdminCosts';
 import { describeError, log } from '../../lib/logger';
 import { adminConfig } from '../../utils/rpg/gateway';
@@ -45,7 +47,7 @@ const translations = {
   en: {
     siteHeading: 'Every RPG',
     tabsLabel: 'Admin sections',
-    tabs: { keys: 'Keys', demo: 'Demo', diesel: 'Diesel', costs: 'Costs', wallets: 'Wallets', prices: 'Prices' } as Record<Tab, string>,
+    tabs: { keys: 'Keys', demo: 'Demo', diesel: 'Diesel', accounts: 'Accounts', costs: 'Costs', wallets: 'Wallets', prices: 'Prices' } as Record<Tab, string>,
     loading: 'Reading…',
     signedOut: 'Sign in with an admin account first.',
     signIn: 'Sign in',
@@ -103,7 +105,7 @@ const translations = {
   pl: {
     siteHeading: 'Every RPG',
     tabsLabel: 'Sekcje panelu admina',
-    tabs: { keys: 'Klucze', demo: 'Demo', diesel: 'Dizel', costs: 'Koszty', wallets: 'Portfele', prices: 'Cennik' } as Record<Tab, string>,
+    tabs: { keys: 'Klucze', demo: 'Demo', diesel: 'Dizel', accounts: 'Konta', costs: 'Koszty', wallets: 'Portfele', prices: 'Cennik' } as Record<Tab, string>,
     loading: 'Czytam…',
     signedOut: 'Najpierw zaloguj się kontem admina.',
     signIn: 'Zaloguj się',
@@ -297,6 +299,7 @@ export default function AdminPanel({
           <div {...panel('diesel', tab)}>
             <DieselSection status={status} t={t} lang={lang} busy={busy} saved={savedAt === 'diesel'} save={save} />
           </div>
+          <AdminAccounts lang={lang} panel={panel('accounts', tab)} />
           <AdminCosts lang={lang} panel={(name: CostsTab) => panel(name, tab)} />
         </>
       )}

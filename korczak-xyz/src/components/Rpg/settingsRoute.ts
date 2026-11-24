@@ -14,7 +14,7 @@
  * first bundle; `AdminPanel.tsx` takes its tab names from here.
  */
 
-export const ADMIN_TABS = ['keys', 'demo', 'diesel', 'costs', 'wallets', 'prices'] as const;
+export const ADMIN_TABS = ['keys', 'demo', 'diesel', 'accounts', 'costs', 'wallets', 'prices'] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
 
 export const SETTINGS_TABS = ['game', 'story', 'account', 'controls', 'admin'] as const;

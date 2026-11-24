@@ -45,6 +45,8 @@ import { ADMIN_REQUEST_PATH, ADMIN_REQUESTS_PATH } from '../../../korczak-xyz/sr
 import { listRequests, readRequest } from './requestLog';
 import { ADMIN_WALLETS_PATH } from '../../../korczak-xyz/src/utils/rpg/wallets';
 import { WalletRefusal, handleWallets } from './wallets';
+import { ADMIN_ACCOUNTS_PATH } from '../../../korczak-xyz/src/utils/rpg/playtime';
+import { listAccounts } from './playtime';
 import { db } from '../runtime';
 
 /** A document by its path, through `collection().doc()` — the one form every test's Firestore fake has. */
@@ -120,7 +122,7 @@ function bodyJson(req: Request): unknown {
   }
 }
 
-/** `/admin/config`, `/admin/requests`, `/admin/request` and `/admin/wallets`, for a uid the gateway has already verified. */
+/** `/admin/config`, `/admin/requests`, `/admin/request`, `/admin/accounts` and `/admin/wallets`, for a uid the gateway has already verified. */
 export async function handleAdmin(req: Request, res: Response, uid: string | null, path = ADMIN_PATH, query = ''): Promise<void> {
   if (!uid) throw new AdminRefusal(401, 'auth', 'admin: sign in first');
   if (!(await isAdminUid(uid))) throw new AdminRefusal(403, 'not-admin', 'admin: this account is not an admin');
@@ -138,6 +140,11 @@ export async function handleAdmin(req: Request, res: Response, uid: string | nul
     const found = await readRequest(new URLSearchParams(query).get('id') ?? '');
     if (!found) throw new AdminRefusal(404, 'no-request', 'admin: no such request');
     res.status(200).json(found);
+    return;
+  }
+  // Every account with its e-mail, its tank and its time in the game (`playtime.ts`).
+  if (path === ADMIN_ACCOUNTS_PATH) {
+    res.status(200).json(await listAccounts());
     return;
   }
   // The providers' wallets against the log's estimate (`wallets.ts`).

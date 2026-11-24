@@ -402,3 +402,12 @@
   color: var(--d-danger);
 }
 
+
+/* The Accounts tab's totals: their row headings read as the table's words, not as column heads. */
+:root:root:root .acct-game .rpg-accounts-totals tbody th {
+  background: none;
+  color: var(--d-ink);
+  font: 400 13px/1.4 var(--d-font);
+  letter-spacing: 0;
+  text-transform: none;
+}

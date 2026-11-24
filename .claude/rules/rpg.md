@@ -1962,6 +1962,27 @@ for an admin) and the last section of `/apps/admin/` on korczak.xyz: one compone
   the roaster's fields beside them stay. The master `enabled` is shown, not set. Note that the site's
   `AdminDemo` saves `demo/config` whole, which drops these three on korczak.xyz's own project.
 
+### The accounts and the time in the game
+
+Owner, 24 Nov 2026: "in the admin, a tab where I see how many accounts there are, the list of e-mails
+and how much time was spent in the game over different ranges". The *Accounts* tab
+(`components/Rpg/AdminAccounts.tsx`, `settings/admin/accounts`), from `GET /admin/accounts`
+(`functions/src/rpg/playtime.ts`, admins only): every Firebase Auth account (up to 5,000) with its
+e-mail, sign-up, last play, diesel tank and its time today / 7 days / 30 days / all; above them the
+totals per window (new accounts, accounts that played, time, time per player). A filter and *Copy
+e-mails* over the list.
+
+- **Time is counted by the page** (`usePlaytime.ts`, in `Rpg.tsx`, signed in only): a second counts
+  while the tab is visible and there was an input in the last `IDLE_MS` (5 min); every `BEAT_MS` and
+  as the tab hides it `POST`s `/playtime` with the seconds (`keepalive`). Nothing kept in the browser.
+- **The gateway adds them** to `rpgPlaytime/{uid}` — `total`, `days.{Warsaw day}`, `lastAt`
+  (Admin SDK only, no rule) — never more than `MAX_BEAT_S` nor the time since that account's
+  `lastAt` (`creditSeconds`), so two tabs count wall time once. Guests are not counted.
+- **Not the replay recordings** (`rpgReplays`, the same day): those expire after 30 days and the
+  total here must not, so the two threads agreed on a counter of its own. Counted from 24 Nov 2026.
+- The totals table has fixed columns and "…" in every cell until the answer, so nothing moves when
+  it comes (measured in Playwright, 375 and 1100 px; shots in `rpg/admin-konta/`).
+
 ### Every paid request is logged, priced and shown
 
 Owner, 10 Nov 2026: "every request to an outside API we pay for should be saved — request, response

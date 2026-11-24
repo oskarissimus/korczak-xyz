@@ -190,6 +190,7 @@ const PIECE_LABELS = new Set(['clue', 'place', 'person', 'hero', 'enemy', 'creat
 import { uiPending, useUi } from './ui';
 import DieselPlant, { DieselBadge, dieselTag } from './DieselPlant';
 import DieselShop from './DieselShop';
+import { usePlaytime } from './usePlaytime';
 // The account's keys in Settings, standalone and signed in only: their cards and styles load on first open.
 const SettingsKeys = lazy(() => import('./SettingsKeys'));
 // The admin panel as Settings' last tab (admins only, standalone): loaded the first time it is opened.
@@ -390,6 +391,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // windows went to the browser and died in the background. The server says when the account
   // has no key (`noKey`), and then the browser asks, so nothing is lost by asking it first.
   setJobAccount(auth.user?.uid ?? null);
+  // Time in the game, for the admin's Accounts tab (`usePlaytime.ts`).
+  usePlaytime(auth.user?.uid ?? null);
   // A signed-in reader's keys may be in the account and not yet in this browser, so nothing decides
   // "no key" before the account has answered — or failed to.
   const keysReady =

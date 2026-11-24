@@ -73,6 +73,8 @@ import { assetContext, handleSelfRig, keepAudio, keepJson, serveReused, serveReu
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { SKIN_PATH, SkinRefusal, handleSkin } from './skin';
 import { AdminRefusal, handleAdmin, readServerKeys } from './admin';
+import { addPlaytime } from './playtime';
+import { PLAYTIME_PATH } from '../../../korczak-xyz/src/utils/rpg/playtime';
 import { reserveDiesel, settleDiesel, walletStatus } from './wallet';
 import { handlePaddleWebhook } from './paddle';
 import { PADDLE_WEBHOOK_PATH } from '../../../korczak-xyz/src/utils/rpg/paddle';
@@ -726,6 +728,32 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
       reportError('rpgApi.skin', e);
       await flushSentry();
       if (!res.headersSent) res.status(502).json({ reason: 'failed', error: { message: 'skin weights unavailable' } });
+    }
+    return;
+  }
+  // Time in the game (`playtime.ts`): a signed-in page's seconds since its last report.
+  if (path === PLAYTIME_PATH && req.method === 'POST') {
+    try {
+      const uid = await uidOf(req);
+      if (!uid) {
+        res.status(401).json({ reason: 'auth', error: { message: 'playtime: sign in first' } });
+        return;
+      }
+      let asked: unknown = null;
+      try {
+        asked = (JSON.parse(bodyOf(req)?.toString('utf8') ?? 'null') as { s?: unknown } | null)?.s ?? null;
+      } catch {
+        /* an unreadable body counts as nothing */
+      }
+      res.status(200).json({ s: await addPlaytime(uid, asked) });
+    } catch (e) {
+      if (e instanceof GatewayRefusal) {
+        res.status(e.status).json({ reason: e.reason, error: { message: e.message } });
+        return;
+      }
+      reportError('rpgApi.playtime', e);
+      await flushSentry();
+      if (!res.headersSent) res.status(502).json({ reason: 'failed' });
     }
     return;
   }
