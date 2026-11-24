@@ -18,7 +18,7 @@
  */
 
 import { guestId, rpgDemoUrl } from './demo';
-import { EMPTY_SUMMARY, REPLAY_LIMITS, newReplayId, type ReplayEvent, type ReplayKind, type ReplaySummary, type ReplayValue } from './replay';
+import { EMPTY_SUMMARY, REPLAY_FRAMES, REPLAY_LIMITS, newReplayId, type ReplayEvent, type ReplayKind, type ReplaySummary, type ReplayValue } from './replay';
 
 const FLUSH_MS = 15_000;
 
@@ -54,6 +54,9 @@ function enabled(): boolean {
 
 const on = enabled();
 
+/** Events after which the screen looks different: a picture of it soon after (`frameSoon`). */
+const SCREEN_CHANGES = new Set<string>(['world', 'beat', 'menu', 'wait', 'waited', 'stall', 'ending', 'notice', 'death']);
+
 function now(): number {
   return Date.now() - t0;
 }
@@ -72,6 +75,7 @@ export function rec(k: ReplayKind, fields: Record<string, ReplayValue | undefine
     e[name] = typeof v === 'string' && v.length > REPLAY_LIMITS.text ? `${v.slice(0, REPLAY_LIMITS.text - 1)}…` : v;
   }
   buffer.push(e);
+  if (SCREEN_CHANGES.has(k)) frameSoon();
   recorded += 1;
   summary.events = recorded;
   note(e);
@@ -280,4 +284,76 @@ export function startReplay(): void {
     }
   });
   window.addEventListener('pagehide', leave);
+}
+
+/*
+ * What the player saw: a small JPEG of the scene every `everyMs` while the game is played, and soon
+ * after anything that changes the screen (`frameSoon`: a step, a dialogue, a wait beginning), never
+ * two within `minGapMs`. Sent on their own to `rpgDemo` as `{kind:'frame'}`, after the session's
+ * first chunk so the server knows the session. Only while the page is visible, and only the scene's
+ * canvas (`RpgScene.captureFrame`), never the page — so never a key typed in Settings.
+ */
+let capture: (() => Promise<Blob | null>) | null = null;
+let framesOn: () => boolean = () => false;
+let framesSent = 0;
+let lastFrameAt = -Infinity;
+let frameTimer: ReturnType<typeof setTimeout> | null = null;
+let soonTimer: ReturnType<typeof setTimeout> | null = null;
+let framing = false;
+
+function frameDue(): void {
+  if (frameTimer !== null) clearTimeout(frameTimer);
+  frameTimer = setTimeout(() => void takeFrame(), REPLAY_FRAMES.everyMs);
+}
+
+async function takeFrame(): Promise<void> {
+  frameDue();
+  if (!on || !capture || framing || !armed || capped || framesSent >= REPLAY_FRAMES.perSession) return;
+  if (document.visibilityState !== 'visible' || !framesOn()) return;
+  const t = now();
+  if (t - lastFrameAt < REPLAY_FRAMES.minGapMs) return;
+  const url = rpgDemoUrl();
+  if (!url) return;
+  framing = true;
+  try {
+    // The server keeps a picture only for a session it has heard of.
+    if (seq === 0) await flushReplay();
+    if (seq === 0) return;
+    const blob = await Promise.race([capture(), new Promise<null>((r) => setTimeout(() => r(null), 2000))]);
+    if (!blob || blob.size > REPLAY_FRAMES.maxBytes) return;
+    lastFrameAt = t;
+    const jpeg = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    framesSent += 1;
+    await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'frame', id, t, jpeg }),
+      headers: { 'Content-Type': 'text/plain' },
+    }).catch(() => {});
+  } catch {
+    // A picture; never the game's problem.
+  } finally {
+    framing = false;
+  }
+}
+
+/** Something on screen changed: a picture shortly, once the scene has drawn it. */
+export function frameSoon(): void {
+  if (!capture || soonTimer !== null) return;
+  soonTimer = setTimeout(() => {
+    soonTimer = null;
+    void takeFrame();
+  }, 1200);
+}
+
+/** Starts the pictures: `take` asks the scene for one, `active` says whether the game is on screen. */
+export function startFrames(take: () => Promise<Blob | null>, active: () => boolean): void {
+  if (!on || capture) return;
+  capture = take;
+  framesOn = active;
+  frameDue();
 }

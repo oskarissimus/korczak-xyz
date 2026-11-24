@@ -3184,10 +3184,47 @@ export class RpgScene {
       this.sky.update(dt, this.camera.position);
       this.cullFar();
       this.renderer.render(this.scene, this.camera);
+      if (this.captures.length) this.takeCaptures();
       this.frames.end(started, this.renderer.info.render, !this.paused);
     };
     this.clock.start();
     tick();
+  }
+
+  /** Pictures asked for (`captureFrame`), taken right after the next frame is drawn. */
+  private captures: { width: number; quality: number; done: (blob: Blob | null) => void }[] = [];
+
+  /**
+   * A small JPEG of what the scene shows, for the admin's replay (`replayRecorder.ts`). Taken in the
+   * same task as the frame is drawn, so the drawing buffer is still whole without
+   * `preserveDrawingBuffer`, which would cost every frame. Only the canvas: never the page around it.
+   */
+  captureFrame(width: number, quality = 0.6): Promise<Blob | null> {
+    return new Promise((done) => this.captures.push({ width, quality, done }));
+  }
+
+  private takeCaptures() {
+    const asked = this.captures;
+    this.captures = [];
+    for (const c of asked) {
+      try {
+        const src = this.renderer.domElement;
+        const w = Math.min(c.width, src.width);
+        const h = Math.max(1, Math.round((src.height / Math.max(1, src.width)) * w));
+        const out = document.createElement('canvas');
+        out.width = w;
+        out.height = h;
+        const ctx = out.getContext('2d');
+        if (!ctx || !src.width) {
+          c.done(null);
+          continue;
+        }
+        ctx.drawImage(src, 0, 0, w, h);
+        out.toBlob((blob) => c.done(blob), 'image/jpeg', c.quality);
+      } catch {
+        c.done(null);
+      }
+    }
   }
 
   /** Which of the loop's steps have thrown already: each goes to Sentry once a scene, not sixty times a second. */

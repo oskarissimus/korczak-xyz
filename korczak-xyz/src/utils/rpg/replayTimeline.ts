@@ -228,10 +228,20 @@ export interface StateAt {
   /** Assets handed to the scene and not standing yet. */
   loading: string[];
   at: { x: number; z: number } | null;
+  /** The dialogue on screen, with the choices it offered. */
+  dialog: { who: string; text: string; opts: string[] } | null;
+  /** A banner over the game shown in the last few seconds. */
+  notice: { title: string; text: string } | null;
+  /** A stall on screen (a step that could not be written), until the player answered it. */
+  stall: string | null;
 }
 
+/** How long a banner stays over the game. */
+const NOTICE_MS = 6000;
+
 export function stateAt(events: readonly ReplayEvent[], t: number): StateAt {
-  const state: StateAt = { screen: '', beat: null, line: null, act: null, waiting: [], pending: [], loading: [], at: null };
+  const state: StateAt = { screen: '', beat: null, line: null, act: null, waiting: [], pending: [], loading: [], at: null, dialog: null, notice: null, stall: null };
+  let noticeAt = -Infinity;
   const waits = new Set<string>();
   const pending = new Map<number, string>();
   const loading = new Map<string, string>();
@@ -278,9 +288,22 @@ export function stateAt(events: readonly ReplayEvent[], t: number): StateAt {
       case 'pos':
         if (num(e.x) !== null && num(e.z) !== null) state.at = { x: num(e.x)!, z: num(e.z)! };
         break;
+      case 'menu':
+        state.dialog = e.who ? { who: str(e.who), text: str(e.text), opts: str(e.opts) ? str(e.opts).split(' | ') : [] } : null;
+        break;
+      case 'notice':
+        state.notice = { title: str(e.title), text: str(e.text) };
+        noticeAt = e.t;
+        break;
+      case 'stall':
+        state.stall = str(e.why);
+        break;
       default:
     }
+    if (e.k === 'waited' && e.r === 'stalled') state.stall = null;
+    if (e.k === 'screen' && e.s !== 'game') state.dialog = null;
   }
+  if (t - noticeAt > NOTICE_MS) state.notice = null;
   state.waiting = [...waits];
   state.pending = [...pending.values()];
   state.loading = [...loading.values()];

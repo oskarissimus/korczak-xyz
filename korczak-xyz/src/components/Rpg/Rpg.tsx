@@ -175,8 +175,9 @@ import {
 } from '../../utils/rpg/music';
 import { prefetchLine, prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type LineTiming, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { recordVoiceLag } from '../../utils/rpg/voiceLag';
-import { rec, setReplayToken, startReplay, waitEnd, waitStart } from '../../utils/rpg/replayRecorder';
+import { rec, setReplayToken, startFrames, startReplay, waitEnd, waitStart } from '../../utils/rpg/replayRecorder';
 import { trackScene } from './replayScene';
+import { REPLAY_FRAMES } from '../../utils/rpg/replay';
 import { DevConsole, FpsBadge, FundsBanner, QuestSummary, StreamLine, WorldProgress, type RemakeOffer } from './DevConsole';
 import { FAL_PRICES, type PersonSlot } from '../../utils/rpg/falPrompts';
 import { loadBadge, loadQuality, saveBadge } from './frames';
@@ -680,6 +681,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const notify = useCallback((title: string, text: string, detail?: string) => {
     const id = Date.now();
     setNotice({ id, title, text, detail });
+    rec('notice', { title, text });
     try {
       navigator.vibrate?.(120);
     } catch {
@@ -1632,8 +1634,15 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // are recorded where they happen.
   const replayModeRef = useRef('');
   replayModeRef.current = onDiesel ? `${storyProvider}, diesel` : storyProvider;
+  // What the player saw: the scene's picture now and then (`startFrames`), while a world is played.
+  const replayFramesRef = useRef(false);
+  replayFramesRef.current = started;
   useEffect(() => {
     startReplay();
+    startFrames(
+      () => sceneRef.current?.captureFrame(REPLAY_FRAMES.width, REPLAY_FRAMES.quality) ?? Promise.resolve(null),
+      () => replayFramesRef.current,
+    );
     setReplayToken(async () => {
       const { auth: firebaseAuth } = await import('../../lib/firebase');
       return (await firebaseAuth?.currentUser?.getIdToken().catch(() => null)) ?? null;
@@ -1649,6 +1658,20 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   useEffect(() => {
     if (ending) rec('ending', { title: ending.title, n: beatRef.current?.index ?? null });
   }, [ending]);
+  // The dialogue as it stands on screen, with the choices it offers; closed, an empty one.
+  const replayMenu = dialogue
+    ? `${dialogue.line.speaker}\u0000${dialogue.line.text}\u0000${dialogue.choices.map((c) => c.label).join(' | ')}`
+    : '';
+  const replayMenuOpenRef = useRef(false);
+  useEffect(() => {
+    if (!dialogue) {
+      if (replayMenuOpenRef.current) rec('menu', {});
+      replayMenuOpenRef.current = false;
+      return;
+    }
+    replayMenuOpenRef.current = true;
+    rec('menu', { who: dialogue.line.speaker, text: dialogue.line.text, opts: dialogue.choices.map((c) => c.label).join(' | ') });
+  }, [replayMenu]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (stalled) rec('stall', { why: stalled.failure, opening: stalled.opening, world: stalled.world ?? false });
   }, [stalled]);

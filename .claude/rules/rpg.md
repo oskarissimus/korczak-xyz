@@ -2121,7 +2121,20 @@ player, so I see the delay and how it affects the game". The *Replay* tab, last 
   holds hatched, idle and hidden, requests and assets packed in rows, the actions as shapes — no lane
   told apart by colour), the state at the playhead in fixed rows, the hero's way, the holds with what
   was being made meanwhile, the assets slowest first, and every event.
-- **Not recorded yet**: the camera, what is in view, the touch stick's movement (only where it led).
+- **What the player saw** (owner, the same day: "so I can see what the player saw on screen"): a
+  JPEG of the 3D scene, 384 px wide at quality 0.6 (~10–20 KB), every 10 s and ~1.2 s after anything
+  that changes the screen (a beat, a dialogue opening, a wait, a banner, a death), at most one per
+  2.5 s and `REPLAY_FRAMES.perSession` (720) a session, only while a world is played and the page is
+  visible. `RpgScene.captureFrame` copies the canvas in the same task right after `render`, so no
+  `preserveDrawingBuffer`. Posted to `rpgDemo` as `{kind:'frame'}`; the server checks the JPEG's
+  magic, counts against the session in a transaction and keeps it in the `-rpg` bucket under
+  `replays/{id}/{t}.jpg`, which a lifecycle rule deletes at 30 days (`terraform/storage.tf`,
+  `terraform/rpg/data.tf`). **Only the canvas is a picture**: the dialogue with its options, the
+  waiting screen, the banners and the step are HTML, so they are drawn back over the picture from
+  the events (`menu`, `notice`, `stall`; `stateAt`), the option about to be picked underlined. Read
+  through `GET /admin/replay-frame?id&t`; `ScreenView` in `AdminReplay.tsx` shows the latest frame
+  at or before the playhead in a fixed 16:9 box and fetches the next three ahead.
+- **Not recorded yet**: the camera, the touch stick's movement (only where it led).
   A new thing the player waits on gets a reason in `replayWaits` in `Rpg.tsx`; a new model setter on
   the scene a line in `replayScene.ts`'s `READERS`.
 

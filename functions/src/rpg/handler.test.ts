@@ -47,6 +47,15 @@ vi.mock('../runtime', () => ({
   },
 }));
 vi.mock('../sentry', () => ({ reportError: vi.fn(), flushSentry: vi.fn(async () => {}) }));
+const saved = new Map<string, Buffer>();
+vi.mock('firebase-admin/storage', () => ({
+  getStorage: () => ({
+    bucket: () => ({
+      file: (name: string) => ({ save: async (b: Buffer) => void saved.set(name, b), download: async () => [saved.get(name)] }),
+      getFiles: async () => [[...saved.keys()].map((name) => ({ name }))],
+    }),
+  }),
+}));
 vi.mock('firebase-admin/auth', () => ({
   getAuth: () => ({
     verifyIdToken: async (token: string) => {
@@ -355,6 +364,23 @@ describe('rpgDemo', () => {
     const bad = response();
     await handleRpgDemo(request('POST', { kind: 'replay', id: '../../etc', seq: 0, events: [] }), bad);
     expect(bad.statusCode).toBe(400);
+  });
+
+  it('keeps a picture of the screen only for a session on record, and only a JPEG', async () => {
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 1)]).toString('base64');
+    const none = response();
+    await handleRpgDemo(request('POST', { kind: 'frame', id: 'r-nosuch0-aaaaaa', t: 1000, jpeg }), none);
+    expect(none.statusCode).toBe(204);
+    const frames = () => [...saved.keys()].filter((k) => k.startsWith('replays/'));
+    expect(frames()).toEqual([]);
+    await handleRpgDemo(request('POST', { kind: 'replay', id: 'r-frames0-bbbbbb', seq: 0, events: [{ t: 0, k: 'open' }] }), response());
+    await handleRpgDemo(request('POST', { kind: 'frame', id: 'r-frames0-bbbbbb', t: 1234, jpeg }), response());
+    expect(frames()).toEqual(['replays/r-frames0-bbbbbb/000001234.jpg']);
+    expect(store.get('rpgReplays/r-frames0-bbbbbb')!.frames).toBe(1);
+    const png = response();
+    await handleRpgDemo(request('POST', { kind: 'frame', id: 'r-frames0-bbbbbb', t: 2000, jpeg: Buffer.from('\x89PNG' + 'x'.repeat(200)).toString('base64') }), png);
+    expect(png.statusCode).toBe(400);
+    expect(frames()).toHaveLength(1);
   });
 
   it('adds reported numbers to the day, capped, and gives them back with the demo spend', async () => {

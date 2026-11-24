@@ -71,6 +71,8 @@ export interface ReplayEvent {
  * - `voice` a line was heard: `who`, `lag` (text on screen → sound), `fetch`, `cached`
  * - `pos` the hero: `x`, `z` · `idle` input came back after `ms` without any
  * - `hide` / `back` the page hidden and shown again · `error` · `cap` the recording stopped
+ * - `menu` a dialogue on screen: `who`, `text`, `opts` (the choices offered, joined by ` | `);
+ *   `menu` with no `who` the dialogue closed · `notice` a banner over the game: `title`, `text`
  */
 export const KINDS = [
   'open',
@@ -100,6 +102,8 @@ export const KINDS = [
   'back',
   'error',
   'cap',
+  'menu',
+  'notice',
 ] as const;
 export type ReplayKind = (typeof KINDS)[number];
 
@@ -171,9 +175,44 @@ export interface ReplaysPage {
 export interface ReplayDetail {
   meta: ReplayMeta;
   events: ReplayEvent[];
+  /** When each picture of the screen was taken, ms since the session began, in order. */
+  frames?: number[];
 }
 
 export const ADMIN_REPLAYS_PATH = '/admin/replays';
+export const ADMIN_REPLAY_FRAME_PATH = '/admin/replay-frame';
+
+/*
+ * What the player saw (owner, 24 Nov 2026: "so I can see what the player saw on the screen"): a small
+ * JPEG of the 3D scene every few seconds and at each moment that matters (a step, a dialogue, a wait
+ * beginning), kept in the game's bucket under `replays/{id}/{t}.jpg` and deleted after 30 days by a
+ * lifecycle rule on that prefix. Only the scene's canvas — never the page around it — so a key typed
+ * in Settings cannot be in a picture; the game's own words over the scene (the dialogue, the waiting
+ * screen) are drawn back on top in the admin from the events.
+ */
+export const REPLAY_FRAMES = {
+  /** Width in pixels; the height follows the player's screen. */
+  width: 384,
+  quality: 0.6,
+  /** Seconds between two pictures while nothing happens, and at least between two at all. */
+  everyMs: 10_000,
+  minGapMs: 2_500,
+  /** One picture's bytes, and pictures in one session (~2 h at one every 10 s). */
+  maxBytes: 80_000,
+  perSession: 720,
+  prefix: 'replays',
+} as const;
+
+/** Where a session's picture at `t` is kept in the bucket. */
+export function framePath(id: string, t: number): string {
+  return `${REPLAY_FRAMES.prefix}/${id}/${String(Math.round(t)).padStart(9, '0')}.jpg`;
+}
+
+/** The `t` of a picture from its path, or null. */
+export function frameTime(path: string): number | null {
+  const m = /\/(\d{1,9})\.jpg$/.exec(path);
+  return m ? Number(m[1]) : null;
+}
 export const ADMIN_REPLAY_PATH = '/admin/replay';
 
 /*

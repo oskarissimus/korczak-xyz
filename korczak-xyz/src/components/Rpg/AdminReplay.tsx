@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 
 import { describeError, log } from '../../lib/logger';
-import { adminReplay, adminReplays } from '../../utils/rpg/gateway';
+import { adminReplay, adminReplayFrame, adminReplays } from '../../utils/rpg/gateway';
 import type { ReplayDetail, ReplayEvent, ReplayMeta, ReplaysPage } from '../../utils/rpg/replay';
 import { buildTimeline, clock, delay, stateAt, type Span, type Timeline } from '../../utils/rpg/replayTimeline';
 
@@ -86,6 +86,17 @@ const translations = {
     eventsTitle: 'Every event',
     mapTitle: 'The hero’s way',
     noMap: 'No movement recorded.',
+    screenTitle: 'What the player saw',
+    screenBlurb:
+      'A picture of the 3D scene every 10 s and at every step, dialogue and wait; the game’s words over it ' +
+      '(the dialogue, the waiting, a banner) are drawn back from the events, as they were at that moment.',
+    frameAge: (s: string) => `picture from ${s} earlier`,
+    frameNow: 'picture from this moment',
+    noFrame: 'no picture yet',
+    frameFailed: 'the picture would not load',
+    onScreen: (s: string) => `On screen: ${s}`,
+    stepOf: (n: number) => `Step ${n}`,
+    willPick: 'picks next',
   },
   pl: {
     title: 'Replay',
@@ -147,6 +158,17 @@ const translations = {
     eventsTitle: 'Wszystkie zdarzenia',
     mapTitle: 'Droga bohatera',
     noMap: 'Brak zapisanego ruchu.',
+    screenTitle: 'Co gracz widział',
+    screenBlurb:
+      'Zrzut sceny 3D co 10 s i przy każdym kroku, dialogu i oczekiwaniu; słowa gry na nim (dialog, ekran ' +
+      'oczekiwania, komunikat) są odtworzone ze zdarzeń, tak jak wyglądały w tym momencie.',
+    frameAge: (s: string) => `zrzut sprzed ${s}`,
+    frameNow: 'zrzut z tej chwili',
+    noFrame: 'jeszcze bez zrzutu',
+    frameFailed: 'zrzut się nie wczytał',
+    onScreen: (s: string) => `Na ekranie: ${s}`,
+    stepOf: (n: number) => `Krok ${n}`,
+    willPick: 'zaraz wybierze',
   },
 };
 
@@ -361,6 +383,7 @@ function SessionView({ id, t, lang, back }: { id: string; t: T; lang: Lang; back
           </span>
         </label>
       </div>
+      <ScreenView id={id} frames={detail?.frames ?? []} events={events} state={state} at={at} t={t} />
       <TimelineChart tl={tl} at={at} setAt={setAt} t={t} />
       <div className="rpg-replay-now">
         <StatePanel state={state} t={t} />
@@ -772,5 +795,115 @@ function EventList({ events, at, setAt, t }: { events: ReplayEvent[]; at: number
         </table>
       </div>
     </>
+  );
+}
+
+/** The latest picture taken at or before `at`, or null. */
+function frameAt(frames: readonly number[], at: number): number | null {
+  let found: number | null = null;
+  for (const f of frames) {
+    if (f > at) break;
+    found = f;
+  }
+  return found;
+}
+
+/**
+ * What the player saw at the playhead: the scene's latest picture, with the game's own words drawn
+ * back over it from the events. A 16:9 box from the first frame, whatever the player's screen was
+ * (a phone's picture is pillarboxed inside it), so nothing moves when the pictures arrive.
+ */
+function ScreenView({
+  id,
+  frames,
+  events,
+  state,
+  at,
+  t,
+}: {
+  id: string;
+  frames: number[];
+  events: ReplayEvent[];
+  state: ReturnType<typeof stateAt>;
+  at: number;
+  t: T;
+}) {
+  const [urls, setUrls] = useState<Map<number, string | 'failed'>>(new Map());
+  const asked = useRef(new Set<number>());
+  const current = frameAt(frames, at);
+
+  // The picture at the playhead and the next few, each fetched once and kept for the session.
+  useEffect(() => {
+    if (current === null) return;
+    const i = frames.indexOf(current);
+    const want = frames.slice(i, i + 4).filter((f) => !asked.current.has(f));
+    for (const f of want) {
+      asked.current.add(f);
+      adminReplayFrame(id, f)
+        .then((blob) => setUrls((m) => new Map(m).set(f, URL.createObjectURL(blob))))
+        .catch(() => setUrls((m) => new Map(m).set(f, 'failed')));
+    }
+  }, [current, frames, id]);
+  const urlsRef = useRef(urls);
+  urlsRef.current = urls;
+  useEffect(
+    () => () => {
+      for (const u of urlsRef.current.values()) if (u !== 'failed') URL.revokeObjectURL(u);
+    },
+    [],
+  );
+
+  const url = current === null ? null : urls.get(current);
+  const inGame = state.screen === 'game' || state.screen === 'ending';
+  const next = events.find((e) => e.t > at && e.k === 'choice');
+  const picks = typeof next?.label === 'string' ? next.label : null;
+  const age = current === null ? null : at - current;
+
+  return (
+    <figure className="rpg-replay-screen-wrap">
+      <figcaption className="acct-dim">
+        <strong>{t.screenTitle}</strong> · {t.screenBlurb}
+      </figcaption>
+      <div className="rpg-replay-screen">
+        {inGame && url && url !== 'failed' && <img src={url} alt="" />}
+        <div className="rpg-replay-hud">
+          <span>
+            {state.beat ? `${t.stepOf(state.beat.n + 1)}: ${state.beat.title}` : t.onScreen(state.screen || '—')}
+            {state.beat?.goal ? <small>{state.beat.goal}</small> : null}
+          </span>
+          <span className="rpg-replay-age">
+            {!inGame ? '' : url === 'failed' ? t.frameFailed : age === null ? t.noFrame : age < 1000 ? t.frameNow : t.frameAge(delay(age))}
+          </span>
+        </div>
+        {state.notice && (
+          <div className="rpg-replay-notice">
+            <strong>{state.notice.title}</strong> {state.notice.text}
+          </div>
+        )}
+        {(state.waiting.length > 0 || state.stall) && (
+          <div className="rpg-replay-wait">
+            {state.stall ? `✖ ${state.stall}` : `⏳ ${state.waiting.map((w) => t.why[w] ?? w).join(', ')}…`}
+          </div>
+        )}
+        {!inGame && !state.waiting.length && <div className="rpg-replay-wait">{t.onScreen(state.screen || '—')}</div>}
+        {state.dialog && (
+          <div className="rpg-replay-dialog">
+            <p>
+              <strong>{state.dialog.who}:</strong> {state.dialog.text}
+            </p>
+            {state.dialog.opts.length > 0 && (
+              <ol>
+                {state.dialog.opts.map((o, n) => (
+                  <li key={n} className={o === picks ? 'rpg-replay-pick' : undefined}>
+                    {o}
+                    {o === picks ? ` ← ${t.willPick}` : ''}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )}
+      </div>
+    </figure>
   );
 }

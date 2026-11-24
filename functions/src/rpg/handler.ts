@@ -85,7 +85,7 @@ import { normLang } from '../../../korczak-xyz/src/utils/rpg/language';
 import { flushSentry, reportError } from '../sentry';
 import { noteRefusal } from './walletAlarm';
 import { grantUsd } from './wallet';
-import { keepReplay, ReplayRefusal } from './replay';
+import { keepFrame, keepReplay, ReplayRefusal } from './replay';
 
 const VOICE_MODEL = FLASH_MODEL;
 
@@ -730,6 +730,7 @@ export async function handleRpgDemo(req: Request, res: Response): Promise<void> 
     const body = parseBody(req.body);
     if (body.kind === 'stats') await stats(res, body);
     else if (body.kind === 'replay') await keepReplay(res, body);
+    else if (body.kind === 'frame') await keepFrame(res, body);
     else if (body.kind === 'beat') await beat(req, res, body);
     else if (body.kind === 'world') await world(req, res, body);
     else if (body.kind === 'voice') await clip(req, res, body);

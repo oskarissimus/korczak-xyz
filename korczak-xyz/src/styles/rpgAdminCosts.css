@@ -540,3 +540,111 @@
   height: 18rem;
   overflow-y: auto;
 }
+
+/* What the player saw: a 16:9 box from the first frame (a phone's picture is pillarboxed in it), the
+   game's words over it on a dark scrim so they read on any picture, in either look. */
+.rpg-replay-screen-wrap {
+  margin: 0;
+}
+
+.rpg-replay-screen-wrap figcaption {
+  margin-bottom: 6px;
+}
+
+.rpg-replay-screen {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.rpg-replay-screen img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.rpg-replay-hud,
+.rpg-replay-notice,
+.rpg-replay-wait,
+.rpg-replay-dialog {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: 6px;
+}
+
+.rpg-replay-hud {
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.rpg-replay-hud small {
+  display: block;
+  opacity: 0.8;
+}
+
+.rpg-replay-age {
+  flex: 0 0 auto;
+  opacity: 0.8;
+  font-size: 11px;
+}
+
+.rpg-replay-notice {
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%;
+  padding: 4px 10px;
+  border: 1px solid #fff;
+}
+
+.rpg-replay-wait {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 80%;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.rpg-replay-dialog {
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  max-height: 55%;
+  overflow: hidden;
+  padding: 6px 10px;
+}
+
+.rpg-replay-dialog p {
+  margin: 0 0 4px;
+}
+
+.rpg-replay-dialog ol {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+/* The option the player is about to take: underlined and named, not a colour alone. */
+.rpg-replay-pick {
+  text-decoration: underline;
+  font-weight: bold;
+}
+
+@media (max-width: 480px) {
+  .rpg-replay-screen {
+    font-size: 11px;
+  }
+}

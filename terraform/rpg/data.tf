@@ -96,6 +96,19 @@ resource "google_storage_bucket" "assets" {
 
   depends_on = [google_project_service.enabled]
 
+
+  # The replays' pictures of the screen (`korczak-xyz/src/utils/rpg/replay.ts`, `REPLAY_FRAMES`): a
+  # recording, not a purchase, kept 30 days. The prefix is the whole scope of the rule.
+  lifecycle_rule {
+    condition {
+      age            = 30
+      matches_prefix = ["replays/"]
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
   lifecycle {
     prevent_destroy = true
   }

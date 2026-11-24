@@ -196,7 +196,8 @@ resource "google_firebase_storage_bucket" "backseat" {
  * Cache API and to check it is not crossed cards, and that 200 needs the bucket's own ACAO header.
  * The origins are `ALLOWED_ORIGINS` in functions/src/sloper/metadata.ts, which the gateway serves.
  *
- * No lifecycle rule: these are the only copy of things somebody paid for, which is the point.
+ * No lifecycle rule on what was paid for: those files are the only copy, which is the point. The one
+ * rule is scoped to `replays/`, the admin's pictures of what a player saw, which are a recording.
  */
 resource "google_storage_bucket" "rpg" {
   project  = local.project_id
@@ -218,6 +219,19 @@ resource "google_storage_bucket" "rpg" {
     method          = ["GET", "HEAD"]
     response_header = ["Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "ETag"]
     max_age_seconds = 3600
+  }
+
+
+  # The replays' pictures of the screen (`korczak-xyz/src/utils/rpg/replay.ts`, `REPLAY_FRAMES`): a
+  # recording, not a purchase, kept 30 days. The prefix is the whole scope of the rule.
+  lifecycle_rule {
+    condition {
+      age            = 30
+      matches_prefix = ["replays/"]
+    }
+    action {
+      type = "Delete"
+    }
   }
 
   lifecycle {

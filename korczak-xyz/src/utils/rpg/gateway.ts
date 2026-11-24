@@ -32,7 +32,7 @@ import {
 import { ACCOUNT_KEY } from '../accountKeys/keys';
 import { ADMIN_PATH, type AdminPatch, type AdminStatus } from './adminConfig';
 import { ADMIN_ACCOUNTS_PATH, PLAYTIME_PATH, type AccountsPage } from './playtime';
-import { ADMIN_REPLAY_PATH, ADMIN_REPLAYS_PATH, type ReplayDetail, type ReplaysPage } from './replay';
+import { ADMIN_REPLAY_FRAME_PATH, ADMIN_REPLAY_PATH, ADMIN_REPLAYS_PATH, type ReplayDetail, type ReplaysPage } from './replay';
 import { ADMIN_WALLETS_PATH, type WalletPatch, type WalletsPage } from './wallets';
 import {
   ADMIN_REQUEST_PATH,
@@ -258,4 +258,11 @@ export function adminReplays(from: number, to: number, signal?: AbortSignal): Pr
 /** One session with every event it recorded; admins only. */
 export function adminReplay(id: string, signal?: AbortSignal): Promise<ReplayDetail> {
   return adminGet<ReplayDetail>(`${ADMIN_REPLAY_PATH}?id=${encodeURIComponent(id)}`, signal);
+}
+
+/** One picture of what a player saw (`REPLAY_FRAMES`), as an image; admins only. */
+export async function adminReplayFrame(id: string, t: number, signal?: AbortSignal): Promise<Blob> {
+  const response = await signedInCall(`${ADMIN_REPLAY_FRAME_PATH}?id=${encodeURIComponent(id)}&t=${Math.round(t)}`, 'GET', signal);
+  if (!response.ok) throw new Error(`gateway: admin ${response.status}`);
+  return response.blob();
 }

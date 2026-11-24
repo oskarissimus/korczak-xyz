@@ -63,6 +63,22 @@ describe('the replay timeline', () => {
     expect(later.loading).toEqual(['person · Radomir']);
   });
 
+  it('puts the dialogue, a banner and a stall back on the screen', () => {
+    const shown: ReplayEvent[] = [
+      { t: 0, k: 'screen', s: 'game' },
+      { t: 100, k: 'notice', title: 'Nowe zadanie', text: 'Mgła' },
+      { t: 200, k: 'menu', who: 'Radomir', text: 'Witaj.', opts: 'Kto? | Żegnaj' },
+      { t: 9000, k: 'menu' },
+      { t: 9500, k: 'stall', why: 'Google 503' },
+      { t: 9500, k: 'wait', r: 'stalled' },
+      { t: 12000, k: 'waited', r: 'stalled', ms: 2500 },
+    ];
+    expect(stateAt(shown, 1000)).toMatchObject({ notice: { title: 'Nowe zadanie' }, dialog: { who: 'Radomir', opts: ['Kto?', 'Żegnaj'] } });
+    expect(stateAt(shown, 9200)).toMatchObject({ notice: null, dialog: null });
+    expect(stateAt(shown, 10000).stall).toBe('Google 503');
+    expect(stateAt(shown, 12500).stall).toBeNull();
+  });
+
   it('prints times', () => {
     expect(clock(65_000)).toBe('1:05');
     expect(clock(3_723_000)).toBe('1:02:03');

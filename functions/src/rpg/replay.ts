@@ -10,6 +10,10 @@
  *   verify (expired in a beacon, say) is ignored, never a reason to refuse — the uid already kept
  *   stays. A guest is the browser's guest id. No address, no e-mail is stored; the admin's list
  *   looks the e-mail up when it is read.
+ * - **What the player saw**: `{kind:'frame'}` is one small JPEG of the scene, kept in the game's
+ *   bucket under `replays/{id}/{t}.jpg` (`framePath`) for a session already on record, at most
+ *   `REPLAY_FRAMES.perSession` of them (counted on the record) and `maxBytes` each, JPEG by its
+ *   first bytes. The bucket deletes the prefix after 30 days (`terraform/storage.tf`, `terraform/rpg/data.tf`).
  * - **What it weighs** is capped by `REPLAY_LIMITS`: events per chunk, bytes per chunk, chunks per
  *   session. Every document carries `expireAt` (30 days), deleted by Firestore's TTL
  *   (`terraform/firestore.tf`, `terraform/rpg/data.tf`).
@@ -17,10 +21,15 @@
 
 import type { Response } from 'express';
 import { getAuth } from 'firebase-admin/auth';
+import { FieldValue } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 import {
   REPLAY_CHUNKS,
   REPLAY_COLLECTION,
+  REPLAY_FRAMES,
+  framePath,
+  frameTime,
   REPLAY_ID,
   REPLAY_LIMITS,
   cleanEvents,
@@ -31,7 +40,7 @@ import {
   type ReplayMeta,
   type ReplaysPage,
 } from '../../../korczak-xyz/src/utils/rpg/replay';
-import { db } from '../runtime';
+import { RPG_BUCKET, db } from '../runtime';
 
 export class ReplayRefusal extends Error {
   constructor(message: string) {
@@ -131,7 +140,8 @@ export async function readReplay(id: string): Promise<ReplayDetail | null> {
   const [snap, chunks] = await Promise.all([ref.get(), ref.collection(REPLAY_CHUNKS).orderBy('seq').get()]);
   if (!snap.exists) return null;
   const meta = metaOf(id, snap.data() ?? {});
-  if (meta.uid) meta.email = (await emailsOf([meta.uid])).get(meta.uid) ?? null;
+  const [emails, frames] = await Promise.all([meta.uid ? emailsOf([meta.uid]) : Promise.resolve(new Map<string, string | null>()), listFrames(id)]);
+  if (meta.uid) meta.email = emails.get(meta.uid) ?? null;
   const events: ReplayEvent[] = [];
   for (const c of chunks.docs) {
     try {
@@ -143,5 +153,56 @@ export async function readReplay(id: string): Promise<ReplayDetail | null> {
   }
   // A beacon and a fetch can cross: order by time, the order they were recorded in within a tie.
   events.sort((a, b) => a.t - b.t);
-  return { meta, events };
+  return { meta, events, frames };
+}
+
+/** One picture of the screen (`REPLAY_FRAMES`). 204 kept or quietly not; 400 only for a malformed one. */
+export async function keepFrame(res: Response, body: Record<string, unknown>): Promise<void> {
+  const id = typeof body.id === 'string' && REPLAY_ID.test(body.id) ? body.id : null;
+  const t = typeof body.t === 'number' && Number.isFinite(body.t) && body.t >= 0 && body.t < 7 * DAY ? Math.round(body.t) : null;
+  if (!id || t === null || typeof body.jpeg !== 'string') throw new ReplayRefusal('replay: bad frame');
+  if (body.jpeg.length > Math.ceil((REPLAY_FRAMES.maxBytes * 4) / 3) + 8) throw new ReplayRefusal('replay: frame too big');
+  const bytes = Buffer.from(body.jpeg, 'base64');
+  // A JPEG starts FF D8 FF; nothing else is kept, whatever it says it is.
+  if (bytes.length < 100 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) throw new ReplayRefusal('replay: not a jpeg');
+  const session = db.collection(REPLAY_COLLECTION).doc(id);
+  const allowed = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(session);
+    if (!snap.exists) return false;
+    const frames = Number(snap.data()?.frames ?? 0);
+    if (!(frames < REPLAY_FRAMES.perSession)) return false;
+    tx.set(session, { frames: FieldValue.increment(1) }, { merge: true });
+    return true;
+  });
+  if (allowed) {
+    await getStorage()
+      .bucket(RPG_BUCKET)
+      .file(framePath(id, t))
+      .save(bytes, { contentType: 'image/jpeg', resumable: false, metadata: { cacheControl: 'private, max-age=86400' } });
+  }
+  res.status(204).send('');
+}
+
+/** When each of a session's pictures was taken, in order. */
+export async function listFrames(id: string): Promise<number[]> {
+  if (!REPLAY_ID.test(id)) return [];
+  const [files] = await getStorage()
+    .bucket(RPG_BUCKET)
+    .getFiles({ prefix: `${REPLAY_FRAMES.prefix}/${id}/` })
+    .catch(() => [[]] as [{ name: string }[]]);
+  return files
+    .map((f) => frameTime(f.name))
+    .filter((t): t is number => t !== null)
+    .sort((a, b) => a - b);
+}
+
+/** One picture's bytes, for the admin; null when there is none. */
+export async function readFrame(id: string, t: number): Promise<Buffer | null> {
+  if (!REPLAY_ID.test(id) || !Number.isFinite(t) || t < 0) return null;
+  const [bytes] = await getStorage()
+    .bucket(RPG_BUCKET)
+    .file(framePath(id, t))
+    .download()
+    .catch(() => [null] as [Buffer | null]);
+  return bytes;
 }
