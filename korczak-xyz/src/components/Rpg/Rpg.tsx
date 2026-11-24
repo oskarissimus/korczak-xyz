@@ -175,6 +175,8 @@ import {
 } from '../../utils/rpg/music';
 import { prefetchLine, prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type LineTiming, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
 import { recordVoiceLag } from '../../utils/rpg/voiceLag';
+import { rec, setReplayToken, startReplay, waitEnd, waitStart } from '../../utils/rpg/replayRecorder';
+import { trackScene } from './replayScene';
 import { DevConsole, FpsBadge, FundsBanner, QuestSummary, StreamLine, WorldProgress, type RemakeOffer } from './DevConsole';
 import { FAL_PRICES, type PersonSlot } from '../../utils/rpg/falPrompts';
 import { loadBadge, loadQuality, saveBadge } from './frames';
@@ -1207,6 +1209,14 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       // Who this beat says is dead, and anyone a decision before it killed, leave the scene now.
       bury(b.dead ?? [], [b.npc.name, ...(b.witness ? [b.witness.npc.name] : [])]);
       recordLine({ kind: 'beat', beat: b.index, speaker: b.title, text: b.objectiveText });
+      rec('beat', {
+        n: b.index,
+        title: b.title,
+        goal: b.objectiveText,
+        npc: b.npc.name,
+        place: b.place?.name ?? null,
+        job: b.job ? `${b.job.kind} ×${b.job.count}` : null,
+      });
       persist();
       if (!announce) return;
       const tt = tRef.current;
@@ -1271,6 +1281,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     if (worldRef.current) setScore({ world: worldRef.current, tone: mood.tone });
     seedRef.current = seedFor(mood.tone);
     questIdRef.current = `q-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    rec('quest', { id: questIdRef.current, mode: replayModeRef.current, tone: mood.tone });
     log.info('rpg.quest.mood', { ...mood, seed: seedRef.current });
 
     // A world just invented is still being built around the hero; an old one only waits for its quest.
@@ -1616,6 +1627,62 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     [flushPlay, gameLang],
   );
 
+  // --- the replay (`utils/rpg/replayRecorder.ts`, the admin's Replay tab) ---------------------------
+  // What the player sees and what holds them, as it changes; the lines, choices, requests and assets
+  // are recorded where they happen.
+  const replayModeRef = useRef('');
+  replayModeRef.current = onDiesel ? `${storyProvider}, diesel` : storyProvider;
+  useEffect(() => {
+    startReplay();
+    setReplayToken(async () => {
+      const { auth: firebaseAuth } = await import('../../lib/firebase');
+      return (await firebaseAuth?.currentUser?.getIdToken().catch(() => null)) ?? null;
+    });
+  }, []);
+  const replayScreen = started ? (ending ? 'ending' : 'game') : menu === 'settings' ? `settings/${settingsTab}` : menu;
+  useEffect(() => {
+    rec('screen', { s: replayScreen });
+  }, [replayScreen]);
+  useEffect(() => {
+    if (world) rec('world', { id: world.id, name: world.name });
+  }, [world?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (ending) rec('ending', { title: ending.title, n: beatRef.current?.index ?? null });
+  }, [ending]);
+  useEffect(() => {
+    if (stalled) rec('stall', { why: stalled.failure, opening: stalled.opening, world: stalled.world ?? false });
+  }, [stalled]);
+  // The waits: whatever the player is held by, from when it began until it let go.
+  const replayWaits: Record<string, boolean> = {
+    world: creating !== null,
+    opening: generating,
+    unfolding,
+    free: freeBusy,
+    stalled: stalled !== null,
+  };
+  const replayWaitKey = Object.entries(replayWaits)
+    .map(([r, v]) => (v ? r : ''))
+    .join(',');
+  useEffect(() => {
+    for (const [r, v] of Object.entries(replayWaits)) {
+      if (v) waitStart(r);
+      else waitEnd(r);
+    }
+  }, [replayWaitKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The hero's way across the map: every 2 s while playing, when it moved more than a step.
+  useEffect(() => {
+    if (!started || ending) return;
+    let last: { x: number; z: number } | null = null;
+    const id = window.setInterval(() => {
+      const at = sceneRef.current?.heroAt();
+      if (!at || document.visibilityState !== 'visible') return;
+      if (last && Math.hypot(at.x - last.x, at.z - last.z) < 1.5) return;
+      last = at;
+      rec('pos', { x: Math.round(at.x * 10) / 10, z: Math.round(at.z * 10) / 10 });
+    }, 2000);
+    return () => window.clearInterval(id);
+  }, [started, ending]);
+
   // --- the scene ----------------------------------------------------------------------------------
 
   useEffect(() => {
@@ -1632,6 +1699,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         const done = progressRef.current + 1;
         progressRef.current = done;
         setProgress(done);
+        rec('progress', { n: done, of: b.job.count });
         persist();
         if (done === b.job.count) {
           scene.setMarker({ npc: b.npc.name });
@@ -1639,13 +1707,17 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         }
       },
       onHealth: setHp,
-      onDeath: () => flash(tRef.current.died),
+      onDeath: () => {
+        rec('death', { n: beatRef.current?.index ?? null });
+        flash(tRef.current.died);
+      },
       onCompass: (angle, distance) => setCompass(angle === null ? null : { angle, distance }),
       onLockChange: setLocked,
       onArrive: (name) => flash(`${tRef.current.arrived}: ${name}`, 4000),
       onSenses: setSenses,
     });
     sceneRef.current = scene;
+    trackScene(scene);
     scene.setRigger(riggerRef.current, falKeyRef.current);
     scene.setJumping(jumpingRef.current);
     scene.setPaused(true);
@@ -2311,6 +2383,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       const own = Boolean(b && to.name === b.npc.name);
       const witness = Boolean(b?.witness && to.name === b.witness.npc.name);
       freeHeroEndRef.current = null;
+      rec('free', { text: said, to: to.name, n: b?.index ?? null });
       // The hero's line on a screen of its own at once, read in the hero's voice while the model
       // answers (owner, 10 Nov 2026); the character's answer comes only once the hero has finished.
       setFreeState('busy');
@@ -2595,6 +2668,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       const current = dialogue;
       if (current) askedRef.current.add(`${current.line.speaker}|${choice.label}`);
       chosenRef.current = choice.label;
+      rec('choice', { label: choice.label, kind: choice.kind ?? 'menu', n: beatRef.current?.index ?? null });
       // What the hunter says, not the way out of a menu ("Back", "Goodbye").
       const said = beatRef.current;
       if (choice.kind && said) {

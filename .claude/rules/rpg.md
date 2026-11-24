@@ -2075,6 +2075,56 @@ to type a balance in where no API says, and the drift between the real and the e
   from the MCP, a dashboard object not in git) e-mails on every event tagged `wallet:empty`, at most
   every 30 minutes, so a provider that stays empty keeps saying so rather than once per issue.
 
+### Replays: every session recorded, and the waits in it
+
+Owner, 24 Nov 2026: "record the game's state while people play, so I can see in the admin how they
+played, what they need, where they get stuck — and when each asset was made and shown to the
+player, so I see the delay and how it affects the game". The *Replay* tab, last of the admin's.
+
+- **What is recorded** (`utils/rpg/replay.ts` lists every kind and its fields): the screens, the
+  world and quest entered (with what pays: `google`, `demo`, `…, diesel`), each beat as it lands
+  (title, goal, person, place, job), every line (`transcript.ts`'s `recordLine`), every choice taken
+  — "Back" and "Goodbye" too, since going round in circles is what being stuck looks like — and each
+  typed line, job progress, a death, the ending, a stall; **the waits** (`wait`/`waited`: the world
+  being invented, the opening, the next beat after a decision, the answer to a typed line, a stall
+  waiting on the player — the states `Rpg.tsx` already shows a waiting screen for); every paid
+  request from `devlog.ts`'s `startRequest`/`endRequest` (`req`/`res`, so the console's chokepoint is
+  the replay's too), the start's stages (`markStage`), each voice line's lag (`recordVoiceLag`);
+  **each asset handed to the scene and when it stands** (`show`/`shown`: `components/Rpg/
+  replayScene.ts` wraps the scene's model setters once, recording only a call with a new URL), the
+  hero's position every 2 s when it moved, an idle stretch of 30 s or more, the page hidden and back.
+- **Asked → made → standing**: `replayTimeline.ts` pairs each `show` with the latest request whose
+  label is its slot or its name (the fal.ai labels are the hub's slots and the people's names), so an
+  asset reads as when it was asked for, when it was made, when the scene was handed it and when it
+  stood. One shown with no request in the session was kept from before (the world's store) and says so.
+  "Standing" is in the scene, not necessarily in view.
+- **Sent** by `utils/rpg/replayRecorder.ts` every 15 s and by `sendBeacon` when the page hides, to
+  `rpgDemo` as `{kind:'replay'}` (`text/plain`, like the stats); nothing until the first key, tap or
+  click, and never from a headless browser (`navigator.webdriver`) unless the page has `?replay=1`.
+  A signed-in player's ID token rides in the body and `functions/src/rpg/replay.ts` verifies it; a
+  token that fails (an old one in a beacon) is ignored and the uid already kept stays. A guest is
+  the browser's guest id (`demo.ts`).
+- **Kept** in `rpgReplays/{id}` (who, language, host, phone or not, a summary the list reads) and
+  `rpgReplays/{id}/rpgReplayChunks/{seq}` (the events as a JSON string), no Firestore rule, Admin SDK
+  only, `expireAt` 30 days with a TTL policy in both projects (`terraform/firestore.tf`,
+  `terraform/rpg/data.tf`). Capped by `REPLAY_LIMITS`: 400 events and 60 KB a chunk, 1000 chunks,
+  20,000 events a session (the browser stops and records `cap`). An hour of play is of the order of
+  100 KB. **Privacy**: no key, address or e-mail is a field; every string is cut to 300 characters
+  and run through `redact` (Google, OpenAI, fal, ElevenLabs keys, bearer tokens, JWTs, `key=` in a
+  URL) on the server, since a provider's error message is where one could slip in. The typed lines
+  and the game's own lines are kept as written. The admin's list looks the e-mail up from the uid
+  when it is read (`getUsers`), never storing it.
+- **Read** through `GET /admin/replays?from&to` (at most 300 sessions, 90 days) and
+  `GET /admin/replay?id` on the gateway, admins only. `AdminReplay.tsx`: the list (who, length,
+  steps, choices, time held and the longest hold, the slowest asset, stalls, where they left), then a
+  session: a summary of where it went, ▶ at 1×/10×/60× or a scrubber, the timeline (screens, steps,
+  holds hatched, idle and hidden, requests and assets packed in rows, the actions as shapes — no lane
+  told apart by colour), the state at the playhead in fixed rows, the hero's way, the holds with what
+  was being made meanwhile, the assets slowest first, and every event.
+- **Not recorded yet**: the camera, what is in view, the touch stick's movement (only where it led).
+  A new thing the player waits on gets a reason in `replayWaits` in `Rpg.tsx`; a new model setter on
+  the scene a line in `replayScene.ts`'s `READERS`.
+
 ### The content rules: every person is invented
 
 Owner, Nov 2026, readying the game for Paddle's review of AI products (generated human faces are a

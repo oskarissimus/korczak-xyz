@@ -47,6 +47,14 @@ vi.mock('../runtime', () => ({
   },
 }));
 vi.mock('../sentry', () => ({ reportError: vi.fn(), flushSentry: vi.fn(async () => {}) }));
+vi.mock('firebase-admin/auth', () => ({
+  getAuth: () => ({
+    verifyIdToken: async (token: string) => {
+      if (token === 'a-good-id-token-for-alice') return { uid: 'alice' };
+      throw new Error('bad token');
+    },
+  }),
+}));
 
 import { handleRpgDemo } from './handler';
 
@@ -309,6 +317,44 @@ describe('rpgDemo', () => {
     await handleRpgDemo(request('POST', { kind: 'voices', lang: 'en' }), res);
     expect(fetch).toHaveBeenCalledTimes(16);
     expect(Object.keys(res.body.lists)).toHaveLength(16);
+  });
+
+  it('keeps a replay chunk: cleaned, capped, with the verified account and never a key', async () => {
+    const ok = response();
+    await handleRpgDemo(
+      request(
+        'POST',
+        JSON.stringify({
+          kind: 'replay',
+          id: 'r-mie1abcd-x7y8z9',
+          seq: 0,
+          startedAt: Date.now() - 5000,
+          token: 'a-good-id-token-for-alice',
+          open: { lang: 'pl', host: 'everyrpg.korczak.xyz', mobile: true, guest: 'guest-123456' },
+          summary: { ms: 5000, beats: 1, waitMs: -4, last: 'game' },
+          events: [
+            { t: 0, k: 'open', lang: 'pl' },
+            { t: 10, k: 'stall', why: 'Google 400: API key AIzaSyA1234567890abcdefghijKLMNOP not valid' },
+            { t: 20, k: 'whatever' },
+          ],
+        }),
+      ),
+      ok,
+    );
+    expect(ok.statusCode).toBe(204);
+    const meta = store.get('rpgReplays/r-mie1abcd-x7y8z9')!;
+    expect(meta).toMatchObject({ uid: 'alice', lang: 'pl', mobile: true, guest: 'guest-123456', chunks: 1 });
+    expect(meta.summary).toMatchObject({ ms: 5000, beats: 1, waitMs: 0, last: 'game' });
+    const chunk = store.get('rpgReplays/r-mie1abcd-x7y8z9/rpgReplayChunks/0000')!;
+    const events = JSON.parse(chunk.events as string);
+    expect(events).toHaveLength(2);
+    expect(events[1].why).toBe('Google 400: API key […] not valid');
+    // A later chunk with an expired token keeps the account already known.
+    await handleRpgDemo(request('POST', { kind: 'replay', id: 'r-mie1abcd-x7y8z9', seq: 1, token: 'expired-token-xxxxxxxxxx', events: [{ t: 30, k: 'hide' }] }), response());
+    expect(store.get('rpgReplays/r-mie1abcd-x7y8z9')).toMatchObject({ uid: 'alice', chunks: 2 });
+    const bad = response();
+    await handleRpgDemo(request('POST', { kind: 'replay', id: '../../etc', seq: 0, events: [] }), bad);
+    expect(bad.statusCode).toBe(400);
   });
 
   it('adds reported numbers to the day, capped, and gives them back with the demo spend', async () => {

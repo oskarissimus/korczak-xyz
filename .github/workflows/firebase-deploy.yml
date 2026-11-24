@@ -95,6 +95,8 @@ on:
       - "korczak-xyz/src/utils/rpg/wallets.ts"
       # Time in the game per account (`/playtime`, the admin's Accounts tab).
       - "korczak-xyz/src/utils/rpg/playtime.ts"
+      # The replays' shape and their cleaning, which `rpgDemo` keeps them by and the admin reads.
+      - "korczak-xyz/src/utils/rpg/replay.ts"
       # What a provider says when its wallet is empty, read by `walletAlarm.ts` (and the game's banner).
       - "korczak-xyz/src/utils/rpg/fundsSigns.ts"
       # The diesel tank and its purchases: the litres and the packs, the balance's names and reservation,

@@ -121,3 +121,27 @@ resource "google_cloud_run_v2_service_iam_member" "skin_weights_from_rpg" {
   role     = "roles/run.invoker"
   member   = "serviceAccount:${data.google_project.this.number}-compute@developer.gserviceaccount.com"
 }
+
+/*
+ * The replays (`korczak-xyz/src/utils/rpg/replay.ts`): how each session went, for the admin's Replay
+ * tab, kept 30 days — the record and its chunks both carry `expireAt`, and Firestore deletes them.
+ */
+resource "google_firestore_field" "rpg_replays_ttl" {
+  project    = local.project_id
+  database   = google_firestore_database.default.name
+  collection = "rpgReplays"
+  field      = "expireAt"
+
+  ttl_config {}
+  index_config {}
+}
+
+resource "google_firestore_field" "rpg_replay_chunks_ttl" {
+  project    = local.project_id
+  database   = google_firestore_database.default.name
+  collection = "rpgReplayChunks"
+  field      = "expireAt"
+
+  ttl_config {}
+  index_config {}
+}

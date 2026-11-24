@@ -382,3 +382,161 @@
 .rpg-accounts-controls input {
   min-width: 0;
 }
+
+/* --- The Replay tab (`AdminReplay.tsx`). Every box keeps its size while it is read: the list's rows
+   of "…", the readout's one row per fact, the timeline's height fixed by its lanes. --- */
+
+.rpg-replay-list {
+  min-height: 16rem;
+  max-height: 32rem;
+}
+
+.rpg-replay-sub {
+  height: 3em;
+  overflow: hidden;
+}
+
+/* Six facts in a box of fixed height: a line that wraps on a phone scrolls inside it, never pushes
+   the timeline down once the session has been read. */
+.rpg-replay-insights ul {
+  margin: 0;
+  padding-left: 1.2em;
+  height: 9.6em;
+  line-height: 1.6em;
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .rpg-replay-insights ul {
+    height: 14.4em;
+  }
+}
+
+.rpg-replay-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.rpg-replay-scrub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.rpg-replay-scrub input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rpg-replay-clock {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 7.5em;
+  text-align: right;
+}
+
+.rpg-replay-chart {
+  overflow-x: auto;
+  background: var(--retro-gray);
+  border: 2px inset var(--retro-white);
+  color: var(--retro-black);
+}
+
+.rpg-replay-chart svg {
+  display: block;
+  min-width: 640px;
+  cursor: crosshair;
+}
+
+.rpg-replay-grid {
+  stroke: currentColor;
+  opacity: 0.15;
+}
+
+.rpg-replay-tick,
+.rpg-replay-span-text {
+  fill: currentColor;
+  font-size: 10px;
+  font-family: sans-serif;
+}
+
+.rpg-replay-lane {
+  fill: currentColor;
+  font-size: 11px;
+  font-weight: bold;
+  font-family: sans-serif;
+}
+
+.rpg-replay-mark {
+  fill: currentColor;
+  font-size: 12px;
+}
+
+.rpg-replay-head {
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.rpg-replay-now {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.rpg-replay-state {
+  flex: 1 1 280px;
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.rpg-replay-state div {
+  display: grid;
+  grid-template-columns: 10em minmax(0, 1fr);
+  gap: 8px;
+  height: 1.5em;
+  line-height: 1.5em;
+}
+
+.rpg-replay-state dt {
+  opacity: 0.7;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rpg-replay-state dd {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rpg-replay-map {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.rpg-replay-map svg {
+  display: block;
+  width: 200px;
+  height: 200px;
+  background: var(--retro-gray);
+  border: 2px inset var(--retro-white);
+  color: var(--retro-black);
+}
+
+.rpg-replay-assets {
+  max-height: 22rem;
+}
+
+.rpg-replay-events {
+  height: 18rem;
+  overflow-y: auto;
+}

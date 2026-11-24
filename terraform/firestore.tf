@@ -84,3 +84,27 @@ resource "google_firestore_field" "rpg_jobs_ttl" {
   ttl_config {}
   index_config {}
 }
+
+/*
+ * The RPG's replays (`korczak-xyz/src/utils/rpg/replay.ts`): a recording of how a session went, for
+ * the admin's Replay tab, kept 30 days. Both the session's record and its chunks carry `expireAt`.
+ */
+resource "google_firestore_field" "rpg_replays_ttl" {
+  project    = local.project_id
+  database   = "(default)"
+  collection = "rpgReplays"
+  field      = "expireAt"
+
+  ttl_config {}
+  index_config {}
+}
+
+resource "google_firestore_field" "rpg_replay_chunks_ttl" {
+  project    = local.project_id
+  database   = "(default)"
+  collection = "rpgReplayChunks"
+  field      = "expireAt"
+
+  ttl_config {}
+  index_config {}
+}

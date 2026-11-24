@@ -9,6 +9,8 @@
  * when a quest starts.
  */
 
+import { rec } from "./replayRecorder";
+
 export type TranscriptKind = "beat" | "npc" | "ask" | "decision" | "clue";
 
 export interface TranscriptLine {
@@ -51,6 +53,8 @@ export function recordLine(line: TranscriptLine): void {
   if (!text) return;
   if (lines.some((l) => l.beat === line.beat && l.kind === line.kind && l.speaker === line.speaker && l.text === text)) return;
   lines = [...lines, { ...line, text }].slice(-LIMIT);
+  // The beat itself is its own event in the replay (`Rpg.tsx`'s `setupBeat`), with more than a line.
+  if (line.kind !== 'beat') rec('line', { kind: line.kind, n: line.beat, who: line.speaker, text });
   changed();
 }
 

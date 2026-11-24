@@ -32,6 +32,7 @@ import {
 import { ACCOUNT_KEY } from '../accountKeys/keys';
 import { ADMIN_PATH, type AdminPatch, type AdminStatus } from './adminConfig';
 import { ADMIN_ACCOUNTS_PATH, PLAYTIME_PATH, type AccountsPage } from './playtime';
+import { ADMIN_REPLAY_PATH, ADMIN_REPLAYS_PATH, type ReplayDetail, type ReplaysPage } from './replay';
 import { ADMIN_WALLETS_PATH, type WalletPatch, type WalletsPage } from './wallets';
 import {
   ADMIN_REQUEST_PATH,
@@ -247,4 +248,14 @@ export function serverCost(response: Response): number | null {
 /** The providers' wallets beside the log's estimate (`wallets.ts`); with a patch, applied first. Admins only. */
 export function adminWallets(patch?: WalletPatch, signal?: AbortSignal): Promise<WalletsPage> {
   return adminGet<WalletsPage>(ADMIN_WALLETS_PATH, signal, patch);
+}
+
+/** The players' sessions last heard of in a range (`replay.ts`), newest first; admins only. */
+export function adminReplays(from: number, to: number, signal?: AbortSignal): Promise<ReplaysPage> {
+  return adminGet<ReplaysPage>(`${ADMIN_REPLAYS_PATH}?from=${Math.floor(from)}&to=${Math.ceil(to)}`, signal);
+}
+
+/** One session with every event it recorded; admins only. */
+export function adminReplay(id: string, signal?: AbortSignal): Promise<ReplayDetail> {
+  return adminGet<ReplayDetail>(`${ADMIN_REPLAY_PATH}?id=${encodeURIComponent(id)}`, signal);
 }

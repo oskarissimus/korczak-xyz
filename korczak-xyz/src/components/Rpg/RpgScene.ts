@@ -2980,6 +2980,11 @@ export class RpgScene {
     this.land();
   }
 
+  /** Where the hunter stands on the ground, for the replay's map (`replayRecorder.ts`). */
+  heroAt(): { x: number; z: number } {
+    return { x: this.player.position.x, z: this.player.position.z };
+  }
+
   /** For tests: beside a clue. */
   teleportToClue(id: string) {
     const mesh = this.clues.get(id);

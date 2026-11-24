@@ -13,6 +13,8 @@
  *   what a player actually hears as a pause after a picked or typed line.
  */
 
+import { rec } from './replayRecorder';
+
 export interface VoiceLag {
   at: number;
   who: string;
@@ -34,6 +36,7 @@ const listeners = new Set<() => void>();
 
 export function recordVoiceLag(lag: VoiceLag): void {
   lags = [...lags, lag].slice(-LIMIT);
+  rec('voice', { who: lag.who, lag: Math.round(lag.lagMs), fetch: Math.round(lag.fetchMs), cached: lag.cached, free: lag.free || undefined });
   version += 1;
   for (const l of listeners) l();
 }

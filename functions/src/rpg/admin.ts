@@ -36,6 +36,8 @@ import {
 } from '../../../korczak-xyz/src/utils/rpg/adminConfig';
 import { MAX_DAILY_USD, MAX_PER_IP_USD, normalizeRpgDemo } from '../../../korczak-xyz/src/utils/rpg/demoLimits';
 import { DIESEL_CONFIG_DOC, MAX_GRANT_USD, MAX_TOPUP_USD } from '../../../korczak-xyz/src/utils/rpg/wallet';
+import { ADMIN_REPLAY_PATH, ADMIN_REPLAYS_PATH } from '../../../korczak-xyz/src/utils/rpg/replay';
+import { listReplays, readReplay } from './replay';
 import { getAuth } from 'firebase-admin/auth';
 import { grantUsd, topUpDiesel } from './wallet';
 import { testServerKeys } from './keyTest';
@@ -145,6 +147,21 @@ export async function handleAdmin(req: Request, res: Response, uid: string | nul
   // Every account with its e-mail, its tank and its time in the game (`playtime.ts`).
   if (path === ADMIN_ACCOUNTS_PATH) {
     res.status(200).json(await listAccounts());
+    return;
+  }
+  // The players' sessions (`replay.ts`): the list of a range, and one session with its events.
+  if (path === ADMIN_REPLAYS_PATH) {
+    const q = new URLSearchParams(query);
+    const to = Number(q.get('to')) || Date.now();
+    const from = Number(q.get('from')) || to - 7 * 86_400_000;
+    if (!(from <= to) || to - from > 90 * 86_400_000) throw new AdminRefusal(400, 'bad-range', 'admin: bad range');
+    res.status(200).json(await listReplays(from, to));
+    return;
+  }
+  if (path === ADMIN_REPLAY_PATH) {
+    const found = await readReplay(new URLSearchParams(query).get('id') ?? '');
+    if (!found) throw new AdminRefusal(404, 'no-replay', 'admin: no such session');
+    res.status(200).json(found);
     return;
   }
   // The providers' wallets against the log's estimate (`wallets.ts`).

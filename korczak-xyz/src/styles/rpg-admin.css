@@ -411,3 +411,23 @@
   letter-spacing: 0;
   text-transform: none;
 }
+
+/* --- The Replay tab in the game's look: the timeline and the map white on the card's surface. --- */
+:root:root:root .acct-game .rpg-replay-chart,
+:root:root:root .acct-game .rpg-replay-map svg {
+  border: 1px solid var(--d-line);
+  border-radius: var(--d-radius);
+  background: var(--d-surface-bg);
+  color: var(--d-ink);
+}
+
+:root:root:root .acct-game .rpg-replay-tick,
+:root:root:root .acct-game .rpg-replay-lane,
+:root:root:root .acct-game .rpg-replay-span-text {
+  font-family: var(--d-font);
+}
+
+:root:root:root .acct-game .rpg-replay-state dt {
+  color: var(--d-ink-dim);
+  opacity: 1;
+}
