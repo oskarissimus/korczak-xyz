@@ -1956,3 +1956,42 @@
     animation: none;
   }
 }
+
+/* The pause menu (☰ Menu or Escape while playing, owner 24 Nov 2026): the sign-out confirmation's
+   panel, its two actions stacked, the way back into play first and white. */
+:root:root .rpg-pause-actions {
+  flex-direction: column;
+}
+
+:root:root .rpg-pause-actions button {
+  flex: none;
+  width: 100%;
+}
+
+/* On a desktop the HUD's first button says what it is: ☰ Menu, and the HP bar moves along beside
+   it. A phone keeps the square (the row of small buttons under it is counted in its pitch). */
+:root:root .rpg-container:not(.rpg-touch) .rpg-leave {
+  top: 10px;
+  left: 10px;
+  width: 84px;
+  height: 32px;
+  padding: 0 10px;
+  font: 600 14px/1 var(--d-font-ui);
+  white-space: nowrap;
+}
+
+:root:root .rpg-container:not(.rpg-touch) .rpg-hp {
+  top: 21px;
+  left: 106px;
+}
+
+@media (max-width: 480px), (max-height: 480px) {
+  :root:root .rpg-container:not(.rpg-touch) .rpg-journal {
+    max-width: calc(100% - 232px - var(--safe-left, 0px) - var(--safe-right, 0px));
+  }
+}
+
+/* The ending's quiet way out, under New quest and New world. */
+:root:root .rpg-ending-exit {
+  margin-top: 4px;
+}

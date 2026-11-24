@@ -2763,8 +2763,16 @@ and I have a black-and-white display set". Decided once per page, by a coarse pr
   straight on, since a crouch there reads as sliding. A dialogue opened in the air lands the hero
   first (`setPaused`). Obstacles still block in the air: it is a hop, not a way over fences.
 - **The whole screen while playing** (`rpg-immersive`: fixed, `100dvh`, the page's scroll locked).
-  iOS has no Fullscreen API for anything but video, so the ⛶ button is hidden there; a `✕` at the
-  top left goes back to the intro, the quest autosaved and offered as Continue.
+  iOS has no Fullscreen API for anything but video, so the ⛶ button is hidden there.
+- **☰ Menu is the way out, on every device** (owner, 24 Nov 2026, a friend's first session on a
+  desktop: finished a quest, found no way to end it, closed the tab — the `✕` that went back to the
+  intro existed only on a phone). Top left while playing: `☰ Menu` with its word on a desktop (the HP
+  bar beside it), the old ✕'s square with ☰ on a phone. It, or Escape with nothing else open (the first
+  Escape under pointer lock only frees the mouse; the hint says `Esc: menu`), opens the pause menu
+  (`pauseOpen`, the sign-out confirmation's panel): the world pauses, *Back to the game* first and
+  white, *Exit to the main menu* calls `leave` — the quest autosaved and offered as Continue behind ⋯.
+  The ending screen has *Finish and go to the main menu* under New quest / New world, since before
+  it the only buttons there started more play.
   It starts **under** the status bar, not behind it: iOS Safari lays its own blurred gradient over
   whatever sits up there and keeps those taps for itself (owner, Oct 2026: the console's tabs and
   the top dialogue choices unclickable under the clock). The strip above (`.safe-top-band`) is painted black while

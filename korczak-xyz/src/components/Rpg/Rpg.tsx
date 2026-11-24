@@ -758,6 +758,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const [libraryTick, setLibraryTick] = useState(0);
   /** Which screen of the intro's menu is showing. */
   const [logOpen, setLogOpen] = useState(false);
+  // The pause menu behind ☰ Menu or Escape (owner, 24 Nov 2026, a new player's feedback: "I don't know
+  // how to close it or end the session" — on a desktop there was no way out of a world at all).
+  const [pauseOpen, setPauseOpen] = useState(false);
   // Any screen's address opens it (`settingsRoute.ts`: `…/worlds`, `…/diesel`…); a world's is opened below.
   const [menu, setMenu] = useState<'main' | 'library' | 'settings' | 'language' | 'trash' | 'diesel'>(() => {
     const r = gameRouteNow();
@@ -2249,8 +2252,11 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   // beat being written is not such a thing: the hunter walks while it is (owner, Oct 2026).
   useEffect(() => {
     // A stalled beat asks a question, and on a desktop the cursor has to come back to answer it.
-    sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || ending !== null || stalled !== null || logOpen);
-  }, [started, dialogue, held, ending, stalled, logOpen]);
+    sceneRef.current?.setPaused(!started || dialogue !== null || held !== null || ending !== null || stalled !== null || logOpen || pauseOpen);
+  }, [started, dialogue, held, ending, stalled, logOpen, pauseOpen]);
+  useEffect(() => {
+    if (!started || ending) setPauseOpen(false);
+  }, [started, ending]);
 
   // The play clock: from Start or Continue to the ending, talking and reading included, a hidden
   // page not. Measured by the clock rather than counted in ticks, which a main thread busy loading
@@ -2733,15 +2739,21 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   }, [choose, close, dialogue, freeBusy, held]);
 
   // J opens the quest journal, as in every RPG since the nineties; Escape or J again closes it.
+  // Escape with nothing open is the pause menu, as in every game: the first press under pointer lock
+  // only lets the mouse go (the browser keeps that key), the next one opens it.
   useEffect(() => {
     if (!started || dialogue) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'KeyJ' && !e.repeat) setLogOpen((open) => !open);
-      else if (e.key === 'Escape') setLogOpen(false);
+      if (e.code === 'KeyJ' && !e.repeat && !pauseOpen) setLogOpen((open) => !open);
+      else if (e.key === 'Escape') {
+        if (logOpen) setLogOpen(false);
+        else if (pauseOpen) setPauseOpen(false);
+        else if (!ending && !devOpen && !document.pointerLockElement) setPauseOpen(true);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [started, dialogue]);
+  }, [started, dialogue, logOpen, pauseOpen, ending, devOpen]);
 
   // `~` (the key under Escape, whatever the layout prints on it) opens the developer console.
   useEffect(() => {
@@ -3139,6 +3151,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     setHeld(null);
     setStarted(false);
     setLogOpen(false);
+    setPauseOpen(false);
     setMenu('main');
     if (stalePullRef.current) {
       stalePullRef.current = false;
@@ -4074,10 +4087,40 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
             />
           )}
 
-          {immersive && (
-            <button type="button" className="rpg-leave" onClick={leave} aria-label={t.leave}>
-              ✕
+          {/* Every device, labelled where there is room (owner, 24 Nov 2026: a new player on a desktop
+              finished a quest and closed the tab, finding no way out). On a phone it is the square
+              the ✕ was, the HUD's row being counted in its pitch. */}
+          {!ending && (
+            <button
+              type="button"
+              className="rpg-leave"
+              onClick={() => {
+                if (document.pointerLockElement) document.exitPointerLock();
+                setPauseOpen(true);
+              }}
+              aria-label={t.menuButton}
+              title={`${t.menuButton} (Esc)`}
+            >
+              ☰{!touch && <span className="rpg-leave-label"> {t.menuButton}</span>}
             </button>
+          )}
+
+          {pauseOpen && (
+            <div className="rpg-confirm-layer">
+              <div className="rpg-home-scrim" aria-hidden="true" onClick={() => setPauseOpen(false)} />
+              <div className="rpg-stalled rpg-confirm rpg-pause" role="dialog" aria-modal="true" aria-labelledby="rpg-pause-title" aria-describedby="rpg-pause-text">
+                <div id="rpg-pause-title" className="rpg-notice-title">{t.pauseTitle}</div>
+                <p id="rpg-pause-text" className="rpg-stalled-why">{t.pauseText}</p>
+                <div className="rpg-stalled-actions rpg-pause-actions">
+                  <button type="button" className="rpg-start" autoFocus onClick={() => setPauseOpen(false)}>
+                    {t.pauseResume}
+                  </button>
+                  <button type="button" onClick={leave}>
+                    {t.pauseExit}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}
@@ -4302,6 +4345,9 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               {t.newWorld}
             </button>
           )}
+          <button type="button" className="rpg-ending-exit" onClick={leave}>
+            {t.endingExit}
+          </button>
         </div>
       )}
 
