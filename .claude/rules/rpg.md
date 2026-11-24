@@ -2134,6 +2134,22 @@ player, so I see the delay and how it affects the game". The *Replay* tab, last 
   the events (`menu`, `notice`, `stall`; `stateAt`), the option about to be picked underlined. Read
   through `GET /admin/replay-frame?id&t`; `ScreenView` in `AdminReplay.tsx` shows the latest frame
   at or before the playhead in a fixed 16:9 box and fetches the next three ahead.
+- **Rebuilt where there is no picture** (owner, the same day, over a session from before the pictures:
+  "can't it be reconstructed? we have the assets and the player's activity"). *Rekonstrukcja* beside
+  *Zrzut* over the screen, and the default before the first picture or where one will not load:
+  `components/Rpg/replayStage.ts` runs the game's own `RpgScene` in the box as a viewer (`{ viewer:
+  true }`: paused, no global hooks, our quick `fit` rig so nothing is woken or paid for) and puts in the
+  world from `GET /admin/replay-world?id&world` (`readReplayWorld`: the bible and atlas of
+  `users/{uid}/rpgWorlds/{worldId}`, only the session's own signed-in player's; the classic world by its
+  language), the hub, forest, ground, cover, hero and weapon from the models kept on it, the atlas's
+  places and people, and the hero where the `pos` events put them (`heroPose`: between the two around
+  the playhead, facing the way they went; a gap over 6 s is standing still) via `RpgScene.poseHero`.
+  Places and people a later step of the same session first names are left out until then (`notYetMet`).
+  **Its limits, said on screen**: the atlas is the world as it stands now (anything from after the
+  session is there), the camera is play's resting angle rather than where the player looked, foes,
+  clues and things to gather are not drawn, and a guest's world lives only in their browser, so a
+  guest's session cannot be rebuilt. Loaded with a dynamic import, so the admin carries no three.js
+  until it is asked for.
 - **Not recorded yet**: the camera, the touch stick's movement (only where it led).
   A new thing the player waits on gets a reason in `replayWaits` in `Rpg.tsx`; a new model setter on
   the scene a line in `replayScene.ts`'s `READERS`.

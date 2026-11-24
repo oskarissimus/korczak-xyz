@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { cleanEvent, cleanEvents, cleanSummary, newReplayId, redact, REPLAY_ID, REPLAY_LIMITS, type ReplayEvent } from './replay';
-import { buildTimeline, clock, delay, stateAt } from './replayTimeline';
+import { buildTimeline, clock, delay, heroPose, notYetMet, stateAt } from './replayTimeline';
 
 const session: ReplayEvent[] = [
   { t: 0, k: 'open', lang: 'pl' },
@@ -112,5 +112,29 @@ describe('what the server keeps of a chunk', () => {
   it('mints ids the server accepts', () => {
     for (let i = 0; i < 50; i++) expect(newReplayId()).toMatch(REPLAY_ID);
     expect(newReplayId(Date.UTC(2026, 10, 24), () => 0)).toMatch(REPLAY_ID);
+  });
+});
+
+describe('the rebuilt scene', () => {
+  const ev = (t: number, k: string, f: Record<string, unknown> = {}): ReplayEvent => ({ t, k, ...f }) as ReplayEvent;
+  it('walks the hero between two positions and faces the way they went', () => {
+    const events = [ev(1000, 'pos', { x: 0, z: 0 }), ev(3000, 'pos', { x: 10, z: 0 })];
+    expect(heroPose(events, 2000)).toEqual({ x: 5, z: 0, dx: 10, dz: 0 });
+    expect(heroPose(events, 500)).toEqual({ x: 0, z: 0, dx: 0, dz: 0 });
+    expect(heroPose(events, 9000)).toEqual({ x: 10, z: 0, dx: 10, dz: 0 });
+    expect(heroPose([], 9000)).toBeNull();
+  });
+  it('does not glide across a long stand', () => {
+    const events = [ev(1000, 'pos', { x: 0, z: 0 }), ev(60_000, 'pos', { x: 10, z: 0 })];
+    expect(heroPose(events, 30_000)).toMatchObject({ x: 0, z: 0 });
+  });
+  it('leaves out what a later step first brings in', () => {
+    const events = [
+      ev(1000, 'beat', { n: 0, npc: 'Bratek', place: '' }),
+      ev(5000, 'beat', { n: 1, npc: 'Mira', place: 'Rdzeń' }),
+      ev(9000, 'beat', { n: 2, npc: 'Bratek', place: 'Rdzeń' }),
+    ];
+    expect(notYetMet(events, 2000)).toEqual({ places: new Set(['Rdzeń']), people: new Set(['Mira']) });
+    expect(notYetMet(events, 6000)).toEqual({ places: new Set(), people: new Set() });
   });
 });

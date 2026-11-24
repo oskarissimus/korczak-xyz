@@ -563,6 +563,42 @@
   line-height: 1.35;
 }
 
+.rpg-replay-modes {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.rpg-replay-modes button {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.rpg-replay-modes button.is-on {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+  opacity: 1;
+}
+
+.rpg-replay-modes button:disabled {
+  opacity: 0.35;
+}
+
+.rpg-replay-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .rpg-replay-screen img {
   position: absolute;
   inset: 0;

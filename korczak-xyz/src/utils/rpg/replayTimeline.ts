@@ -310,6 +310,55 @@ export function stateAt(events: readonly ReplayEvent[], t: number): StateAt {
   return state;
 }
 
+/** Where the hero was at `at`, between the two `pos` around it, and which way they were going. */
+export function heroPose(events: readonly ReplayEvent[], at: number): { x: number; z: number; dx: number; dz: number } | null {
+  let prev: { t: number; x: number; z: number } | null = null;
+  let before: { t: number; x: number; z: number } | null = null;
+  let next: { t: number; x: number; z: number } | null = null;
+  for (const e of events) {
+    if (e.k !== 'pos' || typeof e.x !== 'number' || typeof e.z !== 'number') continue;
+    const p = { t: e.t, x: e.x, z: e.z };
+    if (e.t <= at) {
+      before = prev;
+      prev = p;
+    } else {
+      next = p;
+      break;
+    }
+  }
+  if (!prev) return next ? { x: next.x, z: next.z, dx: 0, dz: 0 } : null;
+  // Positions are taken every 2 s while the hero moves; a longer gap is standing still.
+  if (next && next.t - prev.t <= 6000) {
+    const f = Math.min(1, Math.max(0, (at - prev.t) / Math.max(1, next.t - prev.t)));
+    return { x: prev.x + (next.x - prev.x) * f, z: prev.z + (next.z - prev.z) * f, dx: next.x - prev.x, dz: next.z - prev.z };
+  }
+  return { x: prev.x, z: prev.z, dx: before ? prev.x - before.x : 0, dz: before ? prev.z - before.z : 0 };
+}
+
+/**
+ * The places and people this session's later steps bring in, by name: the atlas is the world as it
+ * stands now, so what a step after `at` first named is left out until then.
+ */
+export function notYetMet(events: readonly ReplayEvent[], at: number): { places: Set<string>; people: Set<string> } {
+  const seenPlaces = new Set<string>();
+  const seenPeople = new Set<string>();
+  const places = new Set<string>();
+  const people = new Set<string>();
+  for (const e of events) {
+    if (e.k !== 'beat') continue;
+    const place = typeof e.place === 'string' ? e.place : '';
+    const npc = typeof e.npc === 'string' ? e.npc : '';
+    if (e.t <= at) {
+      if (place) seenPlaces.add(place);
+      if (npc) seenPeople.add(npc);
+    } else {
+      if (place && !seenPlaces.has(place)) places.add(place);
+      if (npc && !seenPeople.has(npc)) people.add(npc);
+    }
+  }
+  return { places, people };
+}
+
 /** "1:05", "12:40", "1:02:03" — a moment in a session, or a length. */
 export function clock(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));

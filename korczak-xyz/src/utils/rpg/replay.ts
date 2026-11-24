@@ -216,6 +216,24 @@ export function frameTime(path: string): number | null {
 export const ADMIN_REPLAY_PATH = '/admin/replay';
 
 /*
+ * The world a session was played in, for a scene rebuilt where no picture was taken (owner, 24 Nov
+ * 2026: "can't it be reconstructed? we have the assets and the player's activity"): the bible and the
+ * atlas as the account keeps them (`users/{uid}/rpgWorlds/{worldId}`, JSON strings), read for the
+ * session's own player only. A guest's world lives in their browser alone, so there is none.
+ */
+export const ADMIN_REPLAY_WORLD_PATH = '/admin/replay-world';
+
+/** A world id as the game mints them, or a language for the classic world. */
+export const REPLAY_WORLD_ID = /^[a-z0-9-]{1,40}$/;
+
+export interface ReplayWorld {
+  /** The `WorldBible`, as kept. */
+  world: unknown;
+  /** The `Atlas` as it stands now (not as it stood then), or null. */
+  atlas: unknown;
+}
+
+/*
  * Keys look like these: Google's `AIza…`, OpenAI's `sk-…`, fal's `uuid:hex`, ElevenLabs' 32+ hex,
  * a bearer token, a JWT, and `key=`/`token=` in a URL. Anything of the kind becomes `[…]`.
  */

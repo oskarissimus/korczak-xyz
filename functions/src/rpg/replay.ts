@@ -31,6 +31,8 @@ import {
   framePath,
   frameTime,
   REPLAY_ID,
+  REPLAY_WORLD_ID,
+  type ReplayWorld,
   REPLAY_LIMITS,
   cleanEvents,
   cleanOpen,
@@ -205,4 +207,28 @@ export async function readFrame(id: string, t: number): Promise<Buffer | null> {
     .download()
     .catch(() => [null] as [Buffer | null]);
   return bytes;
+}
+
+/**
+ * The world a session played, for the admin's rebuilt scene (`ADMIN_REPLAY_WORLD_PATH`): only the
+ * session's own signed-in player's, and only a world that session entered. Null otherwise.
+ */
+export async function readReplayWorld(id: string, worldId: string): Promise<ReplayWorld | null> {
+  if (!REPLAY_ID.test(id) || !REPLAY_WORLD_ID.test(worldId)) return null;
+  const snap = await db.collection(REPLAY_COLLECTION).doc(id).get();
+  const uid = snap.exists ? snap.data()?.uid : null;
+  if (typeof uid !== 'string' || !uid) return null;
+  const doc = await db.collection('users').doc(uid).collection('rpgWorlds').doc(worldId).get();
+  if (!doc.exists) return null;
+  const parse = (v: unknown): unknown => {
+    if (typeof v !== 'string') return null;
+    try {
+      return JSON.parse(v);
+    } catch {
+      return null;
+    }
+  };
+  const entry = parse(doc.data()?.world) as { world?: unknown } | null;
+  if (!entry?.world) return null;
+  return { world: entry.world, atlas: parse(doc.data()?.atlas) };
 }

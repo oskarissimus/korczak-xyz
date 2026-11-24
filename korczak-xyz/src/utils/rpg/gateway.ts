@@ -32,7 +32,7 @@ import {
 import { ACCOUNT_KEY } from '../accountKeys/keys';
 import { ADMIN_PATH, type AdminPatch, type AdminStatus } from './adminConfig';
 import { ADMIN_ACCOUNTS_PATH, PLAYTIME_PATH, type AccountsPage } from './playtime';
-import { ADMIN_REPLAY_FRAME_PATH, ADMIN_REPLAY_PATH, ADMIN_REPLAYS_PATH, type ReplayDetail, type ReplaysPage } from './replay';
+import { ADMIN_REPLAY_FRAME_PATH, ADMIN_REPLAY_PATH, ADMIN_REPLAY_WORLD_PATH, ADMIN_REPLAYS_PATH, type ReplayDetail, type ReplaysPage, type ReplayWorld } from './replay';
 import { ADMIN_WALLETS_PATH, type WalletPatch, type WalletsPage } from './wallets';
 import {
   ADMIN_REQUEST_PATH,
@@ -265,4 +265,9 @@ export async function adminReplayFrame(id: string, t: number, signal?: AbortSign
   const response = await signedInCall(`${ADMIN_REPLAY_FRAME_PATH}?id=${encodeURIComponent(id)}&t=${Math.round(t)}`, 'GET', signal);
   if (!response.ok) throw new Error(`gateway: admin ${response.status}`);
   return response.blob();
+}
+
+/** The world a session was played in, as its player's account keeps it (`ADMIN_REPLAY_WORLD_PATH`); admins only. */
+export function adminReplayWorld(id: string, world: string, signal?: AbortSignal): Promise<ReplayWorld> {
+  return adminGet<ReplayWorld>(`${ADMIN_REPLAY_WORLD_PATH}?id=${encodeURIComponent(id)}&world=${encodeURIComponent(world)}`, signal);
 }

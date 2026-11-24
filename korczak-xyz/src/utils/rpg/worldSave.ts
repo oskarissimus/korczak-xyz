@@ -461,7 +461,7 @@ export function rawAtlas(worldId: string): Atlas | null {
   return readAtlases()[worldId] ?? null;
 }
 
-function cleanAtlas(atlas: Atlas | undefined): Atlas {
+export function cleanAtlas(atlas: Atlas | undefined): Atlas {
   return {
     // Through the parser again: what is stored is the browser's to edit, and an older game's to have
     // written in an older shape.

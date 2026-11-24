@@ -36,8 +36,8 @@ import {
 } from '../../../korczak-xyz/src/utils/rpg/adminConfig';
 import { MAX_DAILY_USD, MAX_PER_IP_USD, normalizeRpgDemo } from '../../../korczak-xyz/src/utils/rpg/demoLimits';
 import { DIESEL_CONFIG_DOC, MAX_GRANT_USD, MAX_TOPUP_USD } from '../../../korczak-xyz/src/utils/rpg/wallet';
-import { ADMIN_REPLAY_FRAME_PATH, ADMIN_REPLAY_PATH, ADMIN_REPLAYS_PATH } from '../../../korczak-xyz/src/utils/rpg/replay';
-import { listReplays, readFrame, readReplay } from './replay';
+import { ADMIN_REPLAY_FRAME_PATH, ADMIN_REPLAY_PATH, ADMIN_REPLAY_WORLD_PATH, ADMIN_REPLAYS_PATH } from '../../../korczak-xyz/src/utils/rpg/replay';
+import { listReplays, readFrame, readReplay, readReplayWorld } from './replay';
 import { getAuth } from 'firebase-admin/auth';
 import { grantUsd, topUpDiesel } from './wallet';
 import { testServerKeys } from './keyTest';
@@ -164,6 +164,13 @@ export async function handleAdmin(req: Request, res: Response, uid: string | nul
     if (!bytes) throw new AdminRefusal(404, 'no-frame', 'admin: no such picture');
     res.set('Content-Type', 'image/jpeg');
     res.status(200).send(bytes);
+    return;
+  }
+  if (path === ADMIN_REPLAY_WORLD_PATH) {
+    const q = new URLSearchParams(query);
+    const found = await readReplayWorld(q.get('id') ?? '', q.get('world') ?? '');
+    if (!found) throw new AdminRefusal(404, 'no-world', 'admin: no such world on the account');
+    res.status(200).json(found);
     return;
   }
   if (path === ADMIN_REPLAY_PATH) {

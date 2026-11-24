@@ -16,9 +16,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 
 import { describeError, log } from '../../lib/logger';
-import { adminReplay, adminReplayFrame, adminReplays } from '../../utils/rpg/gateway';
+import { adminReplay, adminReplayFrame, adminReplays, adminReplayWorld } from '../../utils/rpg/gateway';
 import type { ReplayDetail, ReplayEvent, ReplayMeta, ReplaysPage } from '../../utils/rpg/replay';
-import { buildTimeline, clock, delay, stateAt, type Span, type Timeline } from '../../utils/rpg/replayTimeline';
+import type { Stage } from './replayStage';
+import { buildTimeline, clock, delay, heroPose, notYetMet, stateAt, type Span, type Timeline } from '../../utils/rpg/replayTimeline';
 
 type Lang = 'en' | 'pl';
 
@@ -89,7 +90,9 @@ const translations = {
     screenTitle: 'What the player saw',
     screenBlurb:
       'A picture of the 3D scene every 10 s and at every step, dialogue and wait; the game’s words over it ' +
-      '(the dialogue, the waiting, a banner) are drawn back from the events, as they were at that moment.',
+      '(the dialogue, the waiting, a banner) are drawn back from the events, as they were at that moment. ' +
+      'Where there is no picture the scene is rebuilt from the world’s models and the hero’s way: play’s camera, ' +
+      'no foes or clues, the places and people as they stand now.',
     frameAge: (s: string) => `picture from ${s} earlier`,
     frameNow: 'picture from this moment',
     noFrame: 'no picture yet',
@@ -97,6 +100,13 @@ const translations = {
     onScreen: (s: string) => `On screen: ${s}`,
     stepOf: (n: number) => `Step ${n}`,
     willPick: 'picks next',
+    modePicture: 'Picture',
+    modeRebuild: 'Rebuilt',
+    rebuildLoading: 'rebuilding the world…',
+    rebuildNoWorld: 'no world to rebuild: a guest’s world lives only in their browser, or it was deleted',
+    rebuildNoWorldYet: 'no world entered yet',
+    rebuildFailed: 'the world would not load',
+    rebuildNote: (m: number, p: number, n: number) => `rebuilt · ${m} models, ${p} places, ${n} people`,
   },
   pl: {
     title: 'Replay',
@@ -161,7 +171,9 @@ const translations = {
     screenTitle: 'Co gracz widział',
     screenBlurb:
       'Zrzut sceny 3D co 10 s i przy każdym kroku, dialogu i oczekiwaniu; słowa gry na nim (dialog, ekran ' +
-      'oczekiwania, komunikat) są odtworzone ze zdarzeń, tak jak wyglądały w tym momencie.',
+      'oczekiwania, komunikat) są odtworzone ze zdarzeń, tak jak wyglądały w tym momencie. Gdzie zrzutu nie ma, ' +
+      'scena jest zrekonstruowana z modeli świata i drogi bohatera: kamera z gry, bez wrogów i śladów, miejsca ' +
+      'i postacie takie, jakie są teraz.',
     frameAge: (s: string) => `zrzut sprzed ${s}`,
     frameNow: 'zrzut z tej chwili',
     noFrame: 'jeszcze bez zrzutu',
@@ -169,6 +181,13 @@ const translations = {
     onScreen: (s: string) => `Na ekranie: ${s}`,
     stepOf: (n: number) => `Krok ${n}`,
     willPick: 'zaraz wybierze',
+    modePicture: 'Zrzut',
+    modeRebuild: 'Rekonstrukcja',
+    rebuildLoading: 'odtwarzam świat…',
+    rebuildNoWorld: 'brak świata do odtworzenia: świat gościa jest tylko w jego przeglądarce albo został usunięty',
+    rebuildNoWorldYet: 'jeszcze nie wszedł do świata',
+    rebuildFailed: 'świat się nie wczytał',
+    rebuildNote: (m: number, p: number, n: number) => `rekonstrukcja · ${m} modeli, ${p} miejsc, ${n} osób`,
   },
 };
 
@@ -855,6 +874,10 @@ function ScreenView({
 
   const url = current === null ? null : urls.get(current);
   const inGame = state.screen === 'game' || state.screen === 'ending';
+  // A picture where there is one; the rebuilt scene before the first, where it failed, or when asked.
+  const [mode, setMode] = useState<'picture' | 'rebuild' | null>(null);
+  const rebuild = mode === 'rebuild' || (mode === null && (current === null || url === 'failed'));
+  const [stageNote, setStageNote] = useState('');
   const next = events.find((e) => e.t > at && e.k === 'choice');
   const picks = typeof next?.label === 'string' ? next.label : null;
   const age = current === null ? null : at - current;
@@ -864,15 +887,24 @@ function ScreenView({
       <figcaption className="acct-dim">
         <strong>{t.screenTitle}</strong> · {t.screenBlurb}
       </figcaption>
+      <div className="rpg-replay-modes" role="group">
+        <button type="button" className={!rebuild ? 'is-on' : undefined} aria-pressed={!rebuild} disabled={!frames.length} onClick={() => setMode('picture')}>
+          {t.modePicture}
+        </button>
+        <button type="button" className={rebuild ? 'is-on' : undefined} aria-pressed={rebuild} onClick={() => setMode('rebuild')}>
+          {t.modeRebuild}
+        </button>
+      </div>
       <div className="rpg-replay-screen">
-        {inGame && url && url !== 'failed' && <img src={url} alt="" />}
+        {inGame && rebuild && <StageView id={id} events={events} at={at} t={t} onNote={setStageNote} />}
+        {inGame && !rebuild && url && url !== 'failed' && <img src={url} alt="" />}
         <div className="rpg-replay-hud">
           <span>
             {state.beat ? `${t.stepOf(state.beat.n + 1)}: ${state.beat.title}` : t.onScreen(state.screen || '—')}
             {state.beat?.goal ? <small>{state.beat.goal}</small> : null}
           </span>
           <span className="rpg-replay-age">
-            {!inGame ? '' : url === 'failed' ? t.frameFailed : age === null ? t.noFrame : age < 1000 ? t.frameNow : t.frameAge(delay(age))}
+            {!inGame ? '' : rebuild ? stageNote : url === 'failed' ? t.frameFailed : age === null ? t.noFrame : age < 1000 ? t.frameNow : t.frameAge(delay(age))}
           </span>
         </div>
         {state.notice && (
@@ -906,4 +938,79 @@ function ScreenView({
       </div>
     </figure>
   );
+}
+
+/** The game's own scene, rebuilt from the world the session played (`replayStage.ts`). */
+function StageView({ id, events, at, t, onNote }: { id: string; events: ReplayEvent[]; at: number; t: T; onNote: (s: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<Stage | null>(null);
+  const [ready, setReady] = useState(0);
+  let worldId = '';
+  for (const e of events) {
+    if (e.t > at) break;
+    if (e.k === 'world' && typeof e.id === 'string') worldId = e.id;
+  }
+
+  useEffect(() => {
+    if (!worldId) {
+      onNote(t.rebuildNoWorldYet);
+      return;
+    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const abort = new AbortController();
+    let stage: Stage | null = null;
+    onNote(t.rebuildLoading);
+    void (async () => {
+      try {
+        const [mod, found] = await Promise.all([
+          import('./replayStage'),
+          adminReplayWorld(id, worldId, abort.signal).catch((e) => {
+            if (abort.signal.aborted) throw e;
+            return null;
+          }),
+        ]);
+        if (abort.signal.aborted) return;
+        const world = mod.stageWorld(found?.world ?? null, worldId);
+        if (!world) {
+          onNote(t.rebuildNoWorld);
+          return;
+        }
+        stage = mod.makeStage(canvas, world, found?.atlas ?? null);
+        stageRef.current = stage;
+        onNote(t.rebuildNote(stage.counts.models, stage.counts.places, stage.counts.people));
+        setReady((n) => n + 1);
+      } catch (e) {
+        if (abort.signal.aborted) return;
+        log.warn('rpg.replay.rebuild.failed', describeError(e));
+        onNote(t.rebuildFailed);
+      }
+    })();
+    return () => {
+      abort.abort();
+      stage?.dispose();
+      stageRef.current = null;
+    };
+  }, [id, worldId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The box is fixed (16:9); the scene follows its size.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const box = canvas?.parentElement;
+    if (!box || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => stageRef.current?.resize(box.clientWidth, box.clientHeight));
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [ready]);
+
+  const met = useMemo(() => notYetMet(events, at), [events, at]);
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    stage.hide(met.places, met.people);
+    const p = heroPose(events, at);
+    if (p) stage.pose(p.x, p.z, p.dx, p.dz);
+  }, [ready, met, events, at]);
+
+  return <canvas ref={canvasRef} className="rpg-replay-stage" />;
 }

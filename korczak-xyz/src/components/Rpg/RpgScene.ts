@@ -496,8 +496,12 @@ export class RpgScene {
     return this.terrain.heightAt(x, z);
   }
 
-  constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks) {
-    onPersonModelStart(() => this.people.warm());
+  /** A scene only looked at (the admin's rebuilt replay): it leaves the game's global hooks alone. */
+  private readonly viewer: boolean;
+
+  constructor(canvas: HTMLCanvasElement, callbacks: SceneCallbacks, opts: { viewer?: boolean } = {}) {
+    this.viewer = opts.viewer === true;
+    if (!this.viewer) onPersonModelStart(() => this.people.warm());
     this.canvas = canvas;
     this.cb = callbacks;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -2985,6 +2989,18 @@ export class RpgScene {
     return { x: this.player.position.x, z: this.player.position.z };
   }
 
+  /**
+   * The admin's rebuilt replay (`replayStage.ts`): the hunter stood at a recorded spot, facing the way
+   * they were going, the camera behind them as it is in play.
+   */
+  poseHero(x: number, z: number, dx: number, dz: number) {
+    this.player.position.set(x, 0, z);
+    this.land();
+    if (Math.hypot(dx, dz) < 1e-3) return;
+    this.yaw = Math.atan2(-dx, -dz);
+    this.player.rotation.y = Math.atan2(dx, dz);
+  }
+
   /** For tests: beside a clue. */
   teleportToClue(id: string) {
     const mesh = this.clues.get(id);
@@ -3618,7 +3634,7 @@ export class RpgScene {
   }
 
   dispose() {
-    onPersonModelStart(null);
+    if (!this.viewer) onPersonModelStart(null);
     cancelAnimationFrame(this.frame);
     this.senses.dispose();
     this.nameTag.remove();
