@@ -955,7 +955,7 @@ export function StreamLine() {
 }
 
 /**
- * What the quest cost and how long it was written for, on the closing screen: every sitting of it
+ * What the quest cost, in diesel, and how long it was written for, on the closing screen: every sitting of it
  * (the autosave carries the earlier ones), and the world it was played in on a line of its own.
  */
 export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | null }) {
@@ -963,6 +963,9 @@ export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | 
   useDevlog();
   const q = questSpend();
   const w = worldSpend(world);
+  // Said in diesel, the game's own money (owner, 25 Nov 2026: "the cost at the end should show in
+  // diesel, not dollars"); the console's rows keep the dollars beside the litres.
+  const dz = (usd: number) => formatLitres(litres(usd), lang);
   const floor = (unknown: boolean) => (unknown ? ' +?' : '');
   const questUsd = spendUsd(q);
   const worldUsd = w ? spendUsd(w) : 0;
@@ -970,12 +973,12 @@ export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | 
     ? [
         // A world from before costs were kept: what its genesis cost is not known.
         w.tokens.input + w.tokens.output + w.tokens.thoughts > 0
-          ? `${tokens(w.tokens.input + w.tokens.output + w.tokens.thoughts)} ${t.worldTokens} ≈ ${formatUsd(w.modelCost)}${floor(w.unpriced || Boolean(w.partial))}`
+          ? `${tokens(w.tokens.input + w.tokens.output + w.tokens.thoughts)} ${t.worldTokens} ≈ ${dz(w.modelCost)}${floor(w.unpriced || Boolean(w.partial))}`
           : w.partial
             ? `${t.tokensLine.toLowerCase()} ?`
             : null,
         w.falModels + w.falTextures > 0
-          ? `fal.ai ${w.falModels}× 3D${w.falTextures > 0 ? ` + ${w.falTextures}× tex` : ''} ≈ ${formatUsd(w.falCost)}`
+          ? `fal.ai ${w.falModels}× 3D${w.falTextures > 0 ? ` + ${w.falTextures}× tex` : ''} ≈ ${dz(w.falCost)}`
           : null,
         w.ms > 0 ? formatMs(w.ms) : null,
       ].filter(Boolean)
@@ -987,19 +990,19 @@ export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | 
         <dd>{formatMs(q.ms)}{floor(Boolean(q.partial))}</dd>
         <dt>{t.tokensLine}</dt>
         <dd>
-          {tokens(q.tokens.input + q.tokens.output + q.tokens.thoughts)} ≈ {formatUsd(q.modelCost)}
+          {tokens(q.tokens.input + q.tokens.output + q.tokens.thoughts)} ≈ {dz(q.modelCost)}
           {floor(q.unpriced || Boolean(q.partial))}
         </dd>
         <dt>ElevenLabs</dt>
         <dd>
-          {q.voiceChars} {t.chars} ≈ {Math.round(q.voiceCredits)} cr ≈ {formatUsd(q.voiceCost)}
+          {q.voiceChars} {t.chars} ≈ {Math.round(q.voiceCredits)} cr ≈ {dz(q.voiceCost)}
           {floor(Boolean(q.partial))}
         </dd>
         {q.musicSeconds > 0 && (
           <>
             <dt>{t.musicLine}</dt>
             <dd>
-              {q.musicSeconds} s ≈ {Math.round(q.musicCredits)} cr ≈ {formatUsd(q.musicCost)}
+              {q.musicSeconds} s ≈ {Math.round(q.musicCredits)} cr ≈ {dz(q.musicCost)}
             </dd>
           </>
         )}
@@ -1007,23 +1010,23 @@ export function QuestSummary({ lang, world }: { lang: Lang; world: WorldBible | 
           <>
             <dt>fal.ai</dt>
             <dd>
-              {q.falModels}× 3D{q.falTextures > 0 ? ` + ${q.falTextures}× tex` : ''} ≈ {formatUsd(q.falCost)}
+              {q.falModels}× 3D{q.falTextures > 0 ? ` + ${q.falTextures}× tex` : ''} ≈ {dz(q.falCost)}
             </dd>
           </>
         )}
         <dt>{t.total}</dt>
-        <dd>≈ {formatUsd(questUsd)}{floor(q.unpriced || Boolean(q.partial))}</dd>
+        <dd>≈ {dz(questUsd)}{floor(q.unpriced || Boolean(q.partial))}</dd>
         {w && (
           <>
             <dt>{t.worldLine}</dt>
             <dd>
-              ≈ {formatUsd(worldUsd)}
+              ≈ {dz(worldUsd)}
               {floor(w.unpriced || Boolean(w.partial))}
               {worldParts.length > 0 && <span className="rpg-summary-detail"> ({worldParts.join(' · ')})</span>}
             </dd>
             <dt>{t.totalWithWorld}</dt>
             <dd>
-              ≈ {formatUsd(questUsd + worldUsd)}
+              ≈ {dz(questUsd + worldUsd)}
               {floor(q.unpriced || Boolean(q.partial) || w.unpriced || Boolean(w.partial))}
             </dd>
           </>
