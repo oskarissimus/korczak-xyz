@@ -2205,6 +2205,12 @@ the price of a world or a beat is in it too."
 - **Litres are only a way of saying dollars** (`utils/rpg/diesel.ts`): one litre is one cent at list
   price, so the $4 a day is 400 L. Nothing stores litres; the demo's caps, reservations and
   settlements stay in dollars, and the two cannot drift apart.
+- **A player never sees a dollar** (owner, 25 Nov 2026: "Dla gracza nie powinno być widocznych dolarów
+  tylko dizel"). The closing screen's *What this quest cost* (`QuestSummary`), the settings' price hints
+  (painter, mesher, rigger) and the `~` console, which anyone can open, say litres; `money` in
+  `DevConsole.tsx` adds the dollars only when `DevConsole` gets `admin` (`auth.isAdmin`). Dollars stay in
+  the admin panel. The account page's provider cards are the player's own keys, billed in dollars by
+  the provider, and keep them.
 - **`DieselPlant.tsx`**: an SVG data centre on a generator. Running, the generator shakes and smokes,
   current runs down the cable, the racks blink. Below `EMPTY_LITRES` (4 L, the cheapest paid step's
   worst case) it is dark and still and the canisters come up. Going from empty to anything (the

@@ -3803,7 +3803,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                     {standalone && auth.user ? (storyProvider === 'demo' ? t.ownKeyBelow : t.addKeyBelow) : storyProvider === 'demo' ? t.ownKey : t.addKey}
                   </li>
                 )}
-                {demo?.today && <li className="rpg-set-note">{t.todayStats(demo.today.launches, formatUsd(demo.today.usd), hoursMinutes(demo.today.playMs))}</li>}
+                {demo?.today && <li className="rpg-set-note">{t.todayStats(demo.today.launches, auth.user && auth.isAdmin ? formatUsd(demo.today.usd) : formatLitres(litres(demo.today.usd), gameLang), hoursMinutes(demo.today.playMs))}</li>}
               </ul>
             ) : (
               <p className="rpg-set-note">{t.readingKeys}</p>
@@ -4437,6 +4437,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
           quest={questView}
           remake={remakeOffer}
           tankLitres={diesel?.litres ?? null}
+          admin={Boolean(auth.user && auth.isAdmin)}
           onClose={() => setDevOpen(false)}
           scene={sceneRef.current}
           badge={fpsBadge}

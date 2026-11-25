@@ -147,6 +147,20 @@ function tokens(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
+/*
+ * Dollars are the admin's; a player sees diesel only (owner, 25 Nov 2026: "Dla gracza nie powinno być
+ * widocznych dolarów tylko dizel"). The console is open to everyone under ~, so every amount in it goes
+ * through `money`, which adds the dollars only while `DevConsole` was rendered with `admin`. Set at the
+ * top of that render, read by its children in the same pass.
+ */
+let usdShown = false;
+
+function money(usd: number | null, lang: Lang | 'en'): string {
+  const l = formatLitres(litres(usd ?? 0), lang);
+  if (usd === null) return usdShown ? '?' : '? L';
+  return usdShown ? `${formatUsd(usd)} ≈ ${l}` : l;
+}
+
 function tail(text: string, lines: number): string {
   const all = text.trimEnd().split('\n');
   return all.slice(-lines).join('\n');
@@ -166,7 +180,7 @@ function headline(r: DevRequest): string {
   if (r.kind === 'music' && r.status === 'ok') parts.push(`${r.chars} s ≈ ${Math.round(r.credits)} cr`);
   // Priced by the gateway (`utils/rpg/gateway.ts`), the figure the reader's ledger holds; else the page's estimate.
   const priced = typeof r.serverCost === 'number';
-  if (r.kind === 'model' ? r.usage || priced : r.status === 'ok') parts.push(`${formatUsd(r.cost)} ≈ ${formatLitres(litres(r.cost ?? 0), 'en')}${priced ? ' (server)' : ''}`);
+  if (r.kind === 'model' ? r.usage || priced : r.status === 'ok') parts.push(`${money(r.cost, 'en')}${priced ? ' (server)' : ''}`);
   // Asked by the server's job runner (`utils/rpg/serverJobs.ts`), which goes on with the page in the background.
   if (r.server) parts.push('☁ server');
   return parts.join(' · ');
@@ -392,16 +406,16 @@ function RemakeBox({ lang, offer }: { lang: Lang; offer: RemakeOffer | null }) {
     <div className="rpg-dev-remake">
       <strong>{t.remakeTitle}</strong>
       <span>
-        {t.shortPainters[painter]} → {t.shortMeshers[mesher]} → {t.shortRiggers[rigger]} · {formatUsd(offer.eachUsd)} {t.remakeEach}
+        {t.shortPainters[painter]} → {t.shortMeshers[mesher]} → {t.shortRiggers[rigger]} · {money(offer.eachUsd, lang)} {t.remakeEach}
       </span>
       <button type="button" disabled={!offer.nearest} onClick={() => offer.run('nearest')}>
-        {offer.nearest ? t.remakeNearest(offer.nearest, formatUsd(offer.eachUsd)) : t.remakeNobody}
+        {offer.nearest ? t.remakeNearest(offer.nearest, money(offer.eachUsd, lang)) : t.remakeNobody}
       </button>
       <button type="button" onClick={() => offer.run('hero')}>
-        {t.remakeHero(formatUsd(offer.eachUsd))}
+        {t.remakeHero(money(offer.eachUsd, lang))}
       </button>
       <button type="button" disabled={offer.count === 0} onClick={() => offer.run('all')}>
-        {t.remakeAll(offer.count, formatUsd(offer.count * offer.eachUsd))}
+        {t.remakeAll(offer.count, money(offer.count * offer.eachUsd, lang))}
       </button>
       {offer.running > 0 && <span className="rpg-dev-pending">{t.remakeRunning(offer.running)}</span>}
     </div>
@@ -546,7 +560,7 @@ function IntroStats({ lang, requests, since }: { lang: Lang; requests: readonly 
       {v ? ` · ${t.introDevVoice} ${ms(v.firstVoiceMs)} · ${t.introDevPicture} ${ms(v.firstPictureMs)} · ${t.introDevNamed} ${ms(v.sketchMs)} · ${t.introDevWritten} ${ms(v.writtenMs)}` : ''}
       {v?.model ? ` · ${v.model}` : ''}
       <br />
-      in {tokens(tok.input)} out {tokens(tok.output)} ≈ {formatUsd(sum('model'))} · ElevenLabs {chars} {t.chars} ≈ {Math.round(credits)} cr ≈ {formatUsd(sum('voice'))} · fal.ai {pictures}× ≈ {formatUsd(sum('fal'))} · {t.total} ≈ {formatUsd(sum('model') + sum('voice') + sum('fal'))}
+      in {tokens(tok.input)} out {tokens(tok.output)} ≈ {money(sum('model'), lang)} · ElevenLabs {chars} {t.chars} ≈ {Math.round(credits)} cr ≈ {money(sum('voice'), lang)} · fal.ai {pictures}× ≈ {money(sum('fal'), lang)} · {t.total} ≈ {money(sum('model') + sum('voice') + sum('fal'), lang)}
       {errors > 0 ? ` · ✗ ${t.errors(errors)}` : ''}
       {v?.error ? ` · ${v.error}` : ''}
     </div>
@@ -580,14 +594,14 @@ function CostTab({ lang }: { lang: Lang }) {
     [t.genTime, formatMs(totals.generationMs)],
     [
       t.tokensLine,
-      `in ${tokens(totals.tokens.input)} out ${tokens(totals.tokens.output)} think ${tokens(totals.tokens.thoughts)} ≈ ${formatUsd(totals.modelCost)}${totals.unpriced ? '+?' : ''}`,
+      `in ${tokens(totals.tokens.input)} out ${tokens(totals.tokens.output)} think ${tokens(totals.tokens.thoughts)} ≈ ${money(totals.modelCost, lang)}${totals.unpriced ? '+?' : ''}`,
     ],
-    ['ElevenLabs', `${totals.voiceChars} ${t.chars} ≈ ${Math.round(totals.voiceCredits)} cr ≈ ${formatUsd(totals.voiceCost)}`],
-    [t.musicLine, `${totals.musicSeconds} s ≈ ${Math.round(totals.musicCredits)} cr ≈ ${formatUsd(totals.musicCost)}`],
-    ['fal.ai', `${totals.falModels}× 3D${totals.falTextures > 0 ? ` + ${totals.falTextures}× tex` : ''} ≈ ${formatUsd(totals.falCost)}`],
+    ['ElevenLabs', `${totals.voiceChars} ${t.chars} ≈ ${Math.round(totals.voiceCredits)} cr ≈ ${money(totals.voiceCost, lang)}`],
+    [t.musicLine, `${totals.musicSeconds} s ≈ ${Math.round(totals.musicCredits)} cr ≈ ${money(totals.musicCost, lang)}`],
+    ['fal.ai', `${totals.falModels}× 3D${totals.falTextures > 0 ? ` + ${totals.falTextures}× tex` : ''} ≈ ${money(totals.falCost, lang)}`],
     [
       t.total,
-      `≈ ${formatUsd(totals.modelCost + totals.voiceCost + totals.musicCost + totals.falCost)} ≈ ${formatLitres(litres(totals.modelCost + totals.voiceCost + totals.musicCost + totals.falCost), lang)}${totals.unpriced ? '+?' : ''}`,
+      `≈ ${money(totals.modelCost + totals.voiceCost + totals.musicCost + totals.falCost, lang)}${totals.unpriced ? '+?' : ''}`,
     ],
     [t.devRequestCount, String(totals.requests)],
   ];
@@ -640,8 +654,11 @@ export function DevConsole({
   onBadge = () => {},
   remake = null,
   tankLitres = null,
+  admin = false,
 }: {
   lang: Lang;
+  /** An admin sees the dollars beside the litres; everyone else diesel only (`money`). */
+  admin?: boolean;
   /** The diesel left — the account's tank, or the demo's day — beside the costs tab; null when there is none. */
   tankLitres?: number | null;
   onClose: () => void;
@@ -655,6 +672,7 @@ export function DevConsole({
   /** The Perf tab's remake of the people standing here, as the switches now stand. */
   remake?: (() => RemakeOffer | null) | null;
 }) {
+  usdShown = admin;
   const t = ui(lang);
   const requests = useDevlog();
   const running = requests.some((r) => r.status === 'waiting' || r.status === 'streaming');
@@ -722,7 +740,7 @@ export function DevConsole({
             {t.devPeople}
           </button>
           <button type="button" role="tab" aria-selected={tab === 'costs'} onClick={() => setTab('costs')}>
-            {t.devCosts} ≈ {formatUsd(totalUsd)} ≈ {formatLitres(litres(totalUsd), lang)}
+            {t.devCosts} ≈ {money(totalUsd, lang)}
             {totals.unpriced ? '+?' : ''}
             {tankLitres !== null && <> · ⛽ {formatLitres(tankLitres, lang)}</>}
             {totals.errors > 0 && <span className="rpg-dev-error"> ✗{totals.errors}</span>}
