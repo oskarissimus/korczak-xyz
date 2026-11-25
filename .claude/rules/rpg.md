@@ -726,6 +726,28 @@ Both are called from the browser on the reader's own key; fal's CORS answers kor
     and all, before sizing. Only for clues and things to gather (`setClueModel`, `setItemModel`):
     a building's plinth can be exactly that shape. Nothing is regenerated; kept models are mended
     as they load, at $0.
+  - **And everything that stands loses it too, and new pieces are not given one** (owner, 25 Nov
+    2026, a screenshot of two trees and a landmark on black squares in a red desert: "there are still
+    black squares at the bottom of some models … can we do both"). Two halves:
+    - *Cut*: `loadHubModel` now cuts a floor from every model — hub, places' pieces, creatures — and
+      `loadForestTree` from the forest's trees, by `FLOOR_STANDING` (`meshShape.ts`) where the small
+      things keep `FLOOR_SMALL`. Calibrated on 32 fresh TRELLIS models (16 pictures, each meshed as
+      drawn and cut out): the two sheets found were one sheet seen both ways — faces up and down across
+      the whole footprint 0.002 of the height apart (`twoFaced`) — under a landmark and through a dead
+      tree at 0.39 of its height, and well wider than the rest (0.30, 0.67 ≤ 0.75). Every real base the
+      small rule would also have cut (an obelisk's plinth, faces 0.058 apart; a pallet under crates and
+      a pagoda's roof, not two-faced; a doorstep reaching 0.90 across) stays.
+    - *Not made*: fal's TRELLIS, given a picture with no alpha, removes the background itself and keeps
+      FLUX's soft shadow as part of the thing. So the picture now goes through BiRefNet first
+      (`matteImage`, `fal-ai/birefnet/v2`, `MATTE_BODY`; in the server's `runFal` too, kept in the
+      bucket like the picture) and TRELLIS gets the PNG's own alpha: of the same 16 pictures meshed
+      as drawn two came back on a sheet, cut out none. 0.8–1.9 s a picture (synchronous `fal.run`),
+      listed at $0 per compute second (`FAL_PRICES.matte`, in the price list). Its own console row
+      (`background off ←`, model `fal-ai/birefnet/v2`); a failure is said there with *meshed from
+      the picture as drawn* and never fails the piece. Not for people (`mattes`), whose pipeline —
+      rigs, the facing check — is as it was. The landmark's prompt lost "standing on a small base"
+      and gained "no shadow". New pieces only: a new TRELLIS body is a new fingerprint, and kept
+      models are mended by the cut as they load.
 - **And the ground** (owner, 27 Oct 2026: "the ground texture should be generated too; now it seems
   to be always grass"). The one Poly Haven scan, dyed the world's ground colour, read as grass in a
   desert, in snow and on a scrapyard alike. Now genesis writes `terrain` (English, ≤14 words, a

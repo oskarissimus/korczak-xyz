@@ -34,7 +34,7 @@ import {
   typicalityTarget,
   type GenesisContext,
 } from '../../../korczak-xyz/src/utils/rpg/genesis';
-import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FAL_PRICES, imageCost } from '../../../korczak-xyz/src/utils/rpg/falPrompts';
+import { FAL_IMAGE_MODEL, FAL_MATTE_MODEL, FAL_MESH_MODEL, FAL_PRICES, imageCost, MATTE_BODY, mattes } from '../../../korczak-xyz/src/utils/rpg/falPrompts';
 import { CARD_ERROR, isCard } from '../../../korczak-xyz/src/utils/rpg/meshShape';
 import {
   JOB_BUDGET_MS,
@@ -404,13 +404,36 @@ async function runFal(uid: string, ref: DocumentReference, spec: FalSpec, key: s
       );
       return;
     }
+    // The background out first, so TRELLIS does not build the picture's shadow into a black sheet
+    // (`matteImage` in `landmark3d.ts` says why). A failure is said and the picture as drawn is meshed.
+    let meshFrom = image;
+    if (mattes(spec.label)) {
+      const matteStart = Date.now();
+      fal.matte = { url: null, ms: null, error: null };
+      await progress.set({ fal }, true);
+      try {
+        const m = await fetch(`https://fal.run/${FAL_MATTE_MODEL}`, { method: 'POST', headers: falHeaders(key), body: JSON.stringify(MATTE_BODY(image)) });
+        if (!m.ok) throw await falFailure(m);
+        const cut = ((await m.json()) as { image?: { url?: string } }).image?.url;
+        if (!cut) throw new Error('no image in the answer');
+        meshFrom = await keepJobFile(
+          uid,
+          { model: FAL_MATTE_MODEL, prompt: spec.prompt, params: { ...MATTE_BODY(image), label: spec.label }, usd: FAL_PRICES.matte, world: null, quest: null },
+          { role: 'image', url: cut, contentType: 'image/png' },
+        );
+        cost += FAL_PRICES.matte;
+        fal.matte = { url: meshFrom, ms: Date.now() - matteStart, error: null };
+      } catch (e) {
+        fal.matte = { url: null, ms: Date.now() - matteStart, error: e instanceof Error ? e.message : String(e) };
+      }
+    }
     const meshStart = Date.now();
     fal.mesh = { state: 'queued', position: null, glb: null, kb: null, queuedMs: null, ms: null, error: null };
     await progress.set({ fal }, true);
     const submit = await fetch(`https://queue.fal.run/${FAL_MESH_MODEL}`, {
       method: 'POST',
       headers: falHeaders(key),
-      body: JSON.stringify({ image_url: image, texture_size: 512, mesh_simplify: spec.simplify }),
+      body: JSON.stringify({ image_url: meshFrom, texture_size: 512, mesh_simplify: spec.simplify }),
     });
     if (!submit.ok) throw await falFailure(submit);
     const queued = (await submit.json()) as { status_url?: string; response_url?: string };
@@ -444,7 +467,7 @@ async function runFal(uid: string, ref: DocumentReference, spec: FalSpec, key: s
     if (bytes && isCard(bytes)) throw new Error(CARD_ERROR);
     const glb = await keepJobFile(
       uid,
-      { model: FAL_MESH_MODEL, prompt: spec.prompt, params: { image_url: image, texture_size: 512, mesh_simplify: spec.simplify, label: spec.label }, usd: FAL_PRICES.mesh, world: null, quest: null },
+      { model: FAL_MESH_MODEL, prompt: spec.prompt, params: { image_url: meshFrom, texture_size: 512, mesh_simplify: spec.simplify, label: spec.label }, usd: FAL_PRICES.mesh, world: null, quest: null },
       { role: 'model_mesh', url: meshed, bytes: bytes ? Buffer.from(bytes) : undefined, contentType: 'model/gltf-binary' },
     );
     const queuedMs = fal.mesh.queuedMs ?? 0;

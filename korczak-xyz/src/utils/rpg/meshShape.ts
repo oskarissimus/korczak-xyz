@@ -134,8 +134,20 @@ export const CARD_ERROR = 'came back as a flat card, not a model';
  * The test is the floor's own shape: flat triangles in one thin layer (`FLOOR_LAYER` of the height)
  * that together cover at least `FLOOR_SHARE` of the footprint and reach across nearly all of it
  * both ways, while everything else in the model stays well inside it (`FLOOR_REST`) — the sheet is
- * larger than the thing, which is what a chest's lid or a coin's face never is. Only the small
- * things are checked (clues and things to gather).
+ * larger than the thing, which is what a chest's lid or a coin's face never is.
+ *
+ * AND UNDER EVERYTHING ELSE THAT STANDS (owner, 25 Nov 2026, a screenshot of two trees and a
+ * landmark on black squares in a red desert: "there are still these black squares at the bottom of
+ * some models"). The small things' rule was kept off the hub, the places and the forest because a
+ * building's plinth or a pallet under crates is the same flat layer at the bottom. So whatever
+ * stands is held to `FLOOR_STANDING`, measured on 32 fresh TRELLIS models the same day (16
+ * pictures, each meshed as drawn and with its background removed). Two had the sheet, both from the
+ * picture as drawn: under a landmark at the bottom, and through a dead tree at 0.39 of its height,
+ * its roots hanging below. Each was one sheet seen both ways — faces up and faces down across the
+ * whole footprint, 0.002 of the height apart (`twoFaced`) — and wider than the rest (0.30 and 0.67
+ * of the box across). Every real base the small things' rule would also have cut was a slab with a
+ * thickness: an obelisk's plinth 0.058 and 0.061 apart, a pallet under crates and a pagoda's roof
+ * not two-faced at all; a house's doorstep reached 0.90 across.
  */
 
 /** How thick, as a share of the height, the layer a floor sheet lies in is. */
@@ -147,11 +159,28 @@ const FLOOR_REACH = 0.9;
 /** How far across the box, along its narrower way, the rest may reach for the sheet to be a floor. */
 const FLOOR_REST = 0.85;
 
+/** What a floor sheet has to be: how much of the footprint it covers, how far the rest reaches, and how high it may lie. */
+export interface FloorRule {
+  share: number;
+  rest: number;
+  /**
+   * How far apart, as a share of the height, its upward and downward faces may lie, each covering at
+   * least half the footprint: a sheet's two faces are a hair apart, a slab's top and bottom its
+   * thickness. Infinity for no such test.
+   */
+  gap: number;
+}
+
+/** Clues, things to gather, the weapon: any flat layer that spans the box, as under the canister. */
+export const FLOOR_SMALL: FloorRule = { share: FLOOR_SHARE, rest: FLOOR_REST, gap: Infinity };
+/** Everything that stands — the hub, places' pieces, the forest, creatures: one sheet seen both ways, well wider than the rest. */
+export const FLOOR_STANDING: FloorRule = { share: 1, rest: 0.75, gap: 0.02 };
+
 /**
  * The triangles (by their number, nine numbers each in `tris`) of a floor sheet in the model: both
  * its faces and its rim, everything lying wholly within its layer. Empty where there is none.
  */
-export function floorTriangles(tris: Float32Array): number[] {
+export function floorTriangles(tris: Float32Array, rule: FloorRule = FLOOR_SMALL): number[] {
   const lo = [Infinity, Infinity, Infinity];
   const hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < tris.length; i++) {
@@ -184,7 +213,7 @@ export function floorTriangles(tris: Float32Array): number[] {
   for (let layer = 0; layer <= layers; layer++) {
     // A sheet's two faces can straddle the boundary between two layers, so each is read with the next.
     const flat = [...flatIn[layer], ...(flatIn[layer + 1] ?? [])];
-    if ((area[layer] + (area[layer + 1] ?? 0)) / footprint < FLOOR_SHARE) continue;
+    if ((area[layer] + (area[layer + 1] ?? 0)) / footprint < rule.share) continue;
     const reach = [Infinity, -Infinity, Infinity, -Infinity];
     let from = Infinity;
     let to = -Infinity;
@@ -199,6 +228,7 @@ export function floorTriangles(tris: Float32Array): number[] {
       }
     }
     if ((reach[1] - reach[0]) / ext[0] < FLOOR_REACH || (reach[3] - reach[2]) / ext[2] < FLOOR_REACH) continue;
+    if (Number.isFinite(rule.gap) && !twoFaced(tris, flat, footprint, ext[1] * rule.gap)) continue;
     // The sheet's rim is not quite flat (under the seal, 87 slivers at its edge), so with it goes
     // everything lying wholly within its layer.
     const margin = ext[1] * 0.015;
@@ -217,7 +247,28 @@ export function floorTriangles(tris: Float32Array): number[] {
       }
     }
     const narrower = Math.min((rest[1] - rest[0]) / ext[0], (rest[3] - rest[2]) / ext[2]);
-    if (narrower <= FLOOR_REST) return sheet;
+    if (narrower <= rule.rest) return sheet;
   }
   return [];
+}
+
+/**
+ * Whether the flat triangles `flat` are one sheet seen both ways: faces up and faces down each
+ * covering half the footprint or more, their mean heights at most `gap` apart. Under the landmark
+ * of 25 Nov 2026 0.93 and 1.00 of the footprint, 0.003 of the height apart; a pallet's top 0.21.
+ */
+function twoFaced(tris: Float32Array, flat: number[], footprint: number, gap: number): boolean {
+  let up = 0, down = 0, upY = 0, downY = 0;
+  for (const t of flat) {
+    const o = t * 9;
+    const ax = tris[o + 3] - tris[o], ay = tris[o + 4] - tris[o + 1], az = tris[o + 5] - tris[o + 2];
+    const bx = tris[o + 6] - tris[o], by = tris[o + 7] - tris[o + 1], bz = tris[o + 8] - tris[o + 2];
+    const ny = az * bx - ax * bz;
+    const area = Math.hypot(ay * bz - az * by, ny, ax * by - ay * bx) / 2;
+    const y = (tris[o + 1] + tris[o + 4] + tris[o + 7]) / 3;
+    if (ny > 0) (up += area), (upY += area * y);
+    else (down += area), (downY += area * y);
+  }
+  if (up < footprint / 2 || down < footprint / 2) return false;
+  return Math.abs(upY / up - downY / down) <= gap;
 }

@@ -44,7 +44,7 @@ import { FRESH_HEADER, meshyRigBody } from './assetStore';
 import { geminiImageCost, type GeminiImageUsage } from './gatewayRoutes';
 import { outOfFunds } from './funds';
 import type { LandmarkModel, WorldBible } from './genesis';
-import { FAL_IMAGE_MODEL, FAL_MESH_MODEL, FRAMED, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, paletteLine, IMAGE_SIZE, DEFAULT_POSE, posePerson, type PersonPose, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
+import { FAL_IMAGE_MODEL, FAL_MATTE_MODEL, FAL_MESH_MODEL, FRAMED, MATTE_BODY, mattes, FAL_PERSON_MESH_MODEL, FAL_PRICES, FAL_RIG_MODEL, hubModelPrompt, hubSlots, paletteLine, IMAGE_SIZE, DEFAULT_POSE, posePerson, type PersonPose, imageCost, SIMPLIFY, type FalSlot, type HubSlot, type PersonSlot } from './falPrompts';
 
 import { falJobId, falSpec, hubScope, type FalSpec, type JobDoc } from './jobs';
 import { CARD_ERROR, isCard } from './meshShape';
@@ -291,6 +291,43 @@ export async function drawImage(
   } catch (err) {
     endRequest(entry, err instanceof Error ? err.message : String(err));
     throw err;
+  }
+}
+
+/**
+ * Step 1½: the picture's background taken out (owner, 25 Nov 2026, black squares under trees and a
+ * landmark: "can we do both" — cut the sheet from the model, and stop it being made). FLUX draws a
+ * soft shadow under a thing however hard the prompt says "no shadow", and fal's TRELLIS, given a
+ * picture with no transparency, takes the background out itself and keeps that shadow as part of the
+ * thing: the black sheet. BiRefNet (`FAL_MATTE_MODEL`) cuts the thing out with the shadow left behind,
+ * and TRELLIS uses the PNG's own alpha as it is. Measured the same day on 16 pictures: 0.8–1.9 s a
+ * picture; of the 16 meshed as drawn two came back on a sheet, of the same 16 cut out none.
+ *
+ * Never the reason a piece fails: an error or an answer with no picture is said in the console and
+ * the model is made from the picture as drawn, whose sheet the scene still cuts (`dropFloor`).
+ */
+export async function matteImage(key: string, image: string, label: FalSlot, o: FalOptions): Promise<string> {
+  const f = o.fetchImpl ?? apiFetch;
+  const entry = startRequest('fal', FAL_MATTE_MODEL, null, `${tryMark(o)}background off ← ${image}`, label);
+  try {
+    const res = await f(`https://fal.run/${FAL_MATTE_MODEL}`, {
+      method: 'POST',
+      headers: headers(key, o),
+      signal: o.signal,
+      body: JSON.stringify(MATTE_BODY(image)),
+    });
+    if (!res.ok) throw await failure(res);
+    const url = ((await res.json()) as { image?: { url?: string } }).image?.url;
+    if (!url) throw new Error('no image in the answer');
+    endRequest(entry, null, { cost: FAL_PRICES.matte, serverCost: serverCost(res), text: `${tryMark(o)}background off ← ${image}\n→ ${url}` });
+    return url;
+  } catch (err) {
+    if (o.signal?.aborted) {
+      endRequest(entry, err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+    endRequest(entry, `${err instanceof Error ? err.message : String(err)} · meshed from the picture as drawn`);
+    return image;
   }
 }
 
@@ -682,7 +719,7 @@ export async function textToRiggedPerson(
  * failure here would, with fal's status first so a refused key still stops the rest.
  */
 async function serverPiece(scope: string, spec: FalSpec, running?: () => void): Promise<{ image: string; glb: string | null; queuedMs: number; costUsd: number } | null> {
-  const e: { image: DevRequest | null; mesh: DevRequest | null } = { image: null, mesh: null };
+  const e: { image: DevRequest | null; matte: DevRequest | null; mesh: DevRequest | null } = { image: null, matte: null, mesh: null };
   let told = false;
   const job = await runServerJob(falJobId(scope), spec, (doc: JobDoc) => {
     const fal = doc.fal;
@@ -696,10 +733,23 @@ async function serverPiece(scope: string, spec: FalSpec, running?: () => void): 
       else if (fal.image.error) endRequest(e.image, fal.image.error);
       else if (fal.image.retry) updateRequest(e.image, { text: `${spec.prompt}\n${fal.image.retry}` });
     }
+    const cut = fal.matte;
+    if (cut) {
+      const head = `background off ← ${fal.image.url}`;
+      if (!e.matte) {
+        e.matte = startRequest('fal', FAL_MATTE_MODEL, null, head, spec.label);
+        updateRequest(e.matte, { server: true });
+      }
+      if (e.matte.status !== 'ok' && e.matte.status !== 'error') {
+        if (cut.url) endRequest(e.matte, null, { cost: FAL_PRICES.matte, text: `${head}\n→ ${cut.url}` });
+        else if (cut.error) endRequest(e.matte, `${cut.error} · meshed from the picture as drawn`);
+      }
+    }
     const m = fal.mesh;
     if (!m) return;
+    const from = cut?.url ?? fal.image.url;
     if (!e.mesh) {
-      e.mesh = startRequest('fal', FAL_MESH_MODEL, null, `← ${fal.image.url}`, spec.label);
+      e.mesh = startRequest('fal', FAL_MESH_MODEL, null, `← ${from}`, spec.label);
       updateRequest(e.mesh, { server: true });
     }
     if (e.mesh.status === 'ok' || e.mesh.status === 'error') return;
@@ -709,11 +759,11 @@ async function serverPiece(scope: string, spec: FalSpec, running?: () => void): 
     }
     if (m.glb) {
       const held = (m.queuedMs ?? 0) >= 1000 ? `, ${Math.round((m.queuedMs ?? 0) / 1000)} s of it in fal's queue` : '';
-      endRequest(e.mesh, null, { cost: FAL_PRICES.mesh, text: `← ${fal.image.url}\n→ ${m.glb}${m.kb ? ` (${m.kb} KB)` : ''}${held}` });
+      endRequest(e.mesh, null, { cost: FAL_PRICES.mesh, text: `← ${from}\n→ ${m.glb}${m.kb ? ` (${m.kb} KB)` : ''}${held}` });
     } else if (m.error) endRequest(e.mesh, m.error);
-    else updateRequest(e.mesh, { text: `← ${fal.image.url}\n${m.state === 'queued' ? `IN_QUEUE #${m.position ?? '?'}` : 'IN_PROGRESS'}` });
+    else updateRequest(e.mesh, { text: `← ${from}\n${m.state === 'queued' ? `IN_QUEUE #${m.position ?? '?'}` : 'IN_PROGRESS'}` });
   });
-  const open = [e.image, e.mesh].filter((r): r is DevRequest => r !== null && r.status !== 'ok' && r.status !== 'error');
+  const open = [e.image, e.matte, e.mesh].filter((r): r is DevRequest => r !== null && r.status !== 'ok' && r.status !== 'error');
   if (!job) {
     open.forEach(dropRequest);
     return null;
@@ -744,9 +794,9 @@ async function imageAndMesh(
     // FLUX schnell drew a sword point down whatever the prompt said, and the hand cannot tell a hilt
     // from a tip by shape alone; Nano Banana Lite drew four of four upright, hilt at the bottom (3 Nov 2026).
     const image = await drawImage(key, prompt, label, o, IMAGE_SIZE, undefined, WEAPON_PAINTER);
-    const { glb, queuedMs } = await buildMesh(key, image, label, o, running);
+    const { glb, queuedMs } = await buildMesh(key, await matteImage(key, image, label, o), label, o, running);
     if (await isCardAt(glb, label, o)) throw new Error(CARD_ERROR);
-    return { image, glb, queuedMs, costUsd: PERSON_PAINTERS[WEAPON_PAINTER].price(IMAGE_SIZE) + FAL_PRICES.mesh };
+    return { image, glb, queuedMs, costUsd: PERSON_PAINTERS[WEAPON_PAINTER].price(IMAGE_SIZE) + FAL_PRICES.matte + FAL_PRICES.mesh };
   }
   if (jobsOn() && !o.fetchImpl) {
     const made = await serverPiece(scope, falSpec(label, prompt), running);
@@ -754,9 +804,10 @@ async function imageAndMesh(
     if (made?.glb && !(await isCardAt(made.glb, label, o))) return { ...made, glb: made.glb };
   }
   const image = await drawImage(key, prompt, label, o);
-  const { glb, queuedMs } = await buildMesh(key, image, label, o, running);
+  const cut = mattes(label);
+  const { glb, queuedMs } = await buildMesh(key, cut ? await matteImage(key, image, label, o) : image, label, o, running);
   if (await isCardAt(glb, label, o)) throw new Error(CARD_ERROR);
-  return { image, glb, queuedMs, costUsd: imageCost() + FAL_PRICES.mesh };
+  return { image, glb, queuedMs, costUsd: imageCost() + (cut ? FAL_PRICES.matte : 0) + FAL_PRICES.mesh };
 }
 
 /** A model's bytes, through the Cache API the scene loads it from, or `fetchImpl` where one is given. */
@@ -1007,7 +1058,7 @@ export function placeAssetPrompt(
     look ? `Colours: walls ${look.wall}, roof ${look.roof}, glowing accents ${look.accent}.` : '',
     paletteLine(look?.light),
     role === 'landmark'
-      ? 'Seen from the front and slightly above, its entrance or face toward the viewer, the whole of it in view, standing on a small base,'
+      ? 'Seen from the front and slightly above, its entrance or face toward the viewer, the whole of it in view,'
       : 'The whole object in view, three-quarter view from slightly above, chunky, thick proportions with no thin or spindly parts,',
     FRAMED,
     'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',

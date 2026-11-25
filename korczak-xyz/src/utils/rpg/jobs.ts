@@ -96,6 +96,11 @@ export interface JobCurrent {
 /** A fal.ai piece's two steps, as far as they have gone. */
 export interface FalProgress {
   image: { url: string | null; ms: number | null; error: string | null; retry: string | null };
+  /**
+   * The picture with its background taken out (`matteImage`), what TRELLIS is given; absent on a job
+   * from before it and on people. An error here is said and the picture as drawn is meshed instead.
+   */
+  matte?: { url: string | null; ms: number | null; error: string | null } | null;
   mesh: {
     /** Waiting for a runner, being made, or made. */
     state: 'queued' | 'running' | 'done' | null;

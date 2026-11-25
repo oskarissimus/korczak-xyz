@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cardShare, floorTriangles, glbTriangles, isCard } from './meshShape';
+import { cardShare, FLOOR_STANDING, floorTriangles, glbTriangles, isCard } from './meshShape';
 import { box, crossed, makeGlb } from './meshShape.fixtures';
 
 const h = 0.5;
@@ -81,5 +81,34 @@ describe('floorTriangles', () => {
 
   it('leaves a small thing with no floor alone', () => {
     expect(floorTriangles(tris(thing(-0.1, 0.1)))).toEqual([]);
+  });
+});
+
+describe('floorTriangles under what stands', () => {
+  it('finds the black square under a tree or a landmark', () => {
+    const t = tris([...sheet(-0.5), ...thing(-0.497, 0.5, 0.15)]);
+    expect(floorTriangles(t, FLOOR_STANDING)).toContain(0);
+  });
+
+  it('leaves a pallet under crates alone: one closed slab, only a little wider than what is on it', () => {
+    const slab = thing(-0.5, -0.46, 0.5);
+    expect(floorTriangles(tris([...slab, ...thing(-0.46, 0.5, 0.42)]), FLOOR_STANDING)).toEqual([]);
+  });
+
+  it('leaves a building on a plinth alone, though its walls are well inside it', () => {
+    const plinth = thing(-0.5, -0.46, 0.5);
+    expect(floorTriangles(tris([...plinth, ...thing(-0.46, 0.5, 0.3)]), FLOOR_STANDING)).toEqual([]);
+  });
+
+  it('finds it through the middle, as through the dead tree whose roots hung below it', () => {
+    expect(floorTriangles(tris([...thing(-0.5, 0.5, 0.15), ...sheet(-0.1)]), FLOOR_STANDING)).toContain(12);
+  });
+
+  it('leaves a thin slab alone though it is wide: its top and bottom are its thickness apart', () => {
+    expect(floorTriangles(tris([...sheet(-0.44, 0.06), ...thing(-0.44, 0.5, 0.15)]), FLOOR_STANDING)).toEqual([]);
+  });
+
+  it('leaves a sheet alone that the thing nearly fills', () => {
+    expect(floorTriangles(tris([...sheet(-0.5), ...thing(-0.497, 0.5, 0.42)]), FLOOR_STANDING)).toEqual([]);
   });
 });

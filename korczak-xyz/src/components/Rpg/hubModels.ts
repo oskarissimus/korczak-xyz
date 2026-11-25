@@ -13,7 +13,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { HubSize } from '../../utils/rpg/genesis';
 import { fitScale } from '../../utils/rpg/hubLayout';
 import { loadLandmarkBytes } from '../../utils/rpg/landmark3d';
-import { floorTriangles } from '../../utils/rpg/meshShape';
+import { FLOOR_SMALL, FLOOR_STANDING, floorTriangles, type FloorRule } from '../../utils/rpg/meshShape';
 
 // Sized by the slot, or by the world's own size for it: `HUB_FIT`, `hubFit` (`utils/rpg/hubLayout.ts`).
 export { HUB_FIT, hubFit } from '../../utils/rpg/hubLayout';
@@ -26,14 +26,16 @@ export interface HubModel {
 }
 
 /**
- * `small`: a thing lying on the ground (a clue, a thing to gather), whose floor sheet is cut away
- * before it is sized (`floorTriangles`, `utils/rpg/meshShape.ts`).
+ * The floor sheet TRELLIS makes of a picture's shadow is cut away before the model is sized
+ * (`floorTriangles`, `utils/rpg/meshShape.ts`): `small`, a thing lying on the ground (a clue, a thing
+ * to gather), by the small things' rule, a sheet anywhere in it; anything else by the standing
+ * rule, a two-sided sheet at the bottom well wider than the rest, so a plinth or a pallet stays.
  */
 export async function loadHubModel(url: string, fit: { height: number; width: number }, small = false): Promise<HubModel> {
   const bytes = await loadLandmarkBytes(url);
   const gltf = await new GLTFLoader().parseAsync(bytes, '');
   const model = gltf.scene;
-  if (small) dropFloor(model);
+  dropFloor(model, small ? FLOOR_SMALL : FLOOR_STANDING);
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
   const scale = fitScale(size, fit);
@@ -59,7 +61,7 @@ export async function loadHubModel(url: string, fit: { height: number; width: nu
 }
 
 /** Cuts the floor sheet out of every mesh it runs through, vertices and all, so the box no longer counts it. */
-export function dropFloor(model: THREE.Object3D): void {
+export function dropFloor(model: THREE.Object3D, rule: FloorRule = FLOOR_SMALL): void {
   model.updateMatrixWorld(true);
   const meshes: { mesh: THREE.Mesh; index: ArrayLike<number> }[] = [];
   const corners: number[] = [];
@@ -76,7 +78,7 @@ export function dropFloor(model: THREE.Object3D): void {
       corners.push(v.x, v.y, v.z);
     }
   });
-  const drop = new Set(floorTriangles(Float32Array.from(corners)));
+  const drop = new Set(floorTriangles(Float32Array.from(corners), rule));
   if (!drop.size) return;
   let first = 0;
   for (const { mesh, index } of meshes) {
@@ -147,6 +149,8 @@ export async function loadForestTree(url: string, fit: HubSize = FOREST_FIT): Pr
   await MeshoptSimplifier.ready;
   const gltf = await new GLTFLoader().parseAsync(bytes, '');
   const model = gltf.scene;
+  // Before the box, as in `loadHubModel`: a shadow's sheet planted four hundred times is a forest of black squares.
+  dropFloor(model, FLOOR_STANDING);
   model.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());

@@ -216,6 +216,8 @@ export function falCost(model: string, body: Record<string, unknown>): number | 
       return 0.042;
     case 'fal-ai/trellis':
       return FAL_PRICES.mesh;
+    case 'fal-ai/birefnet/v2':
+      return FAL_PRICES.matte;
     case 'fal-ai/trellis-2':
       return 0.25;
     case 'tripo3d/tripo/v2.5/image-to-3d':

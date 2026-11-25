@@ -280,6 +280,13 @@ const FAL_SPECS: FalSpec[] = [
   },
   { model: 'fal-ai/trellis', verbatim: 'Your request will cost $ 0.02 per generation .', method: '$0.02 flat', typical: MODEL_3D },
   {
+    model: 'fal-ai/birefnet/v2',
+    verbatim: 'Your request will cost $0 per compute second.',
+    method: '$0 flat',
+    typical: L('one picture with its background taken out, before TRELLIS', 'jeden obrazek z usuniętym tłem, przed TRELLIS'),
+    note: L('Checked 25 Nov 2026; kept as a price so it is counted the day fal.ai changes it.', 'Sprawdzone 25 lis 2026; zostaje jako cena, żeby liczyła się, gdy fal.ai ją zmieni.'),
+  },
+  {
     model: 'fal-ai/trellis-2',
     verbatim: 'Your request will cost $0.25 for 512p resolution, $0.30 for 1024p resolution and $0.35 for 1536p resolution.',
     method: '$0.25 flat',

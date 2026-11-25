@@ -15,7 +15,18 @@ export const FAL_RIG_MODEL = 'fal-ai/meshy/rigging';
 export const FAL_PERSON_MESH_MODEL = 'fal-ai/meshy/v6/image-to-3d';
 
 /** List prices, US dollars, Oct 2026 (fal.ai/models/fal-ai/flux/schnell, …/fal-ai/trellis, …/fal-ai/meshy/rigging, …/fal-ai/meshy/v6/image-to-3d). */
-export const FAL_PRICES = { imagePerMegapixel: 0.003, mesh: 0.02, rig: 0.2, meshyMesh: 0.8 } as const;
+/**
+ * `matte`: BiRefNet, which fal.ai lists at "$0 per compute second" (fal.ai/models/fal-ai/birefnet/v2,
+ * 25 Nov 2026); kept as a price so the console and the gateway count it the day that changes.
+ */
+export const FAL_PRICES = { imagePerMegapixel: 0.003, mesh: 0.02, rig: 0.2, meshyMesh: 0.8, matte: 0 } as const;
+
+/** What takes a picture's background out before TRELLIS (`matteImage` in `landmark3d.ts`, `runFal` on the server). */
+export const FAL_MATTE_MODEL = 'fal-ai/birefnet/v2';
+/** Its request: the light general model at its own 1024², a PNG with the background transparent. */
+export const MATTE_BODY = (image: string) => ({ image_url: image, model: 'General Use (Light)', operating_resolution: '1024x1024', output_format: 'png' });
+/** Which pieces are cut out before TRELLIS: everything but people, whose own pipeline (rigs, the facing check) is left as it was. */
+export const mattes = (label: string): boolean => !['person', 'hero', 'enemy'].includes(label);
 
 export const IMAGE_SIZE = 512;
 
@@ -162,9 +173,11 @@ export function hubModelPrompt(world: PromptWorld, slot: HubSlot = 'landmark'): 
       `A single stylised low-poly game asset: ${subject}.`,
       `Colours: walls ${look.wall}, roof ${look.roof}, glowing accents ${look.accent}.`,
       paletteLine(look.light),
-      'The whole object in view, three-quarter view from slightly above, standing on a small base,',
+      // No "standing on a small base" (until 25 Nov 2026): a base on white is drawn with the shadow
+      // under it, and TRELLIS built that into a black sheet across the landmark's whole box.
+      'The whole object in view, three-quarter view from slightly above,',
       FRAMED,
-      'isolated on a plain white background, no ground, no people, no text, soft even light.',
+      'isolated on a plain white background, no ground, no shadow, no people, no text, soft even light.',
     ]
       .filter(Boolean)
       .join(' ');

@@ -7,6 +7,7 @@ import { classicWorld, type WorldBible } from './genesis';
 import {
   ensureHubModels,
   FAL_IMAGE_MODEL,
+  FAL_MATTE_MODEL,
   FAL_MESH_MODEL,
   FAL_PERSON_MESH_MODEL,
   FAL_RIG_MODEL,
@@ -54,6 +55,7 @@ function falFetch(calls: string[], fail?: { url: string; status: number }) {
     calls.push(url);
     if (fail && url.startsWith(fail.url)) return json({ detail: 'nope' }, fail.status);
     if (url === `https://fal.run/${FAL_IMAGE_MODEL}`) return json({ images: [{ url: 'https://fal.media/img.jpg' }] });
+    if (url === `https://fal.run/${FAL_MATTE_MODEL}`) return json({ image: { url: 'https://fal.media/cut.png' } });
     if (url === `https://queue.fal.run/${FAL_MESH_MODEL}`)
       return json({ status: 'IN_QUEUE', status_url: 'https://q/status', response_url: 'https://q/result' });
     if (url === 'https://q/status') return json({ status: polls++ ? 'COMPLETED' : 'IN_PROGRESS' });
@@ -80,6 +82,7 @@ describe('landmark3d', () => {
     const f = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === `https://fal.run/${FAL_IMAGE_MODEL}`) return json({ images: [{ url: `https://fal.media/img${++pictures}.jpg` }] });
+      if (url === `https://fal.run/${FAL_MATTE_MODEL}`) return json({ image: { url: `https://fal.media/cut${pictures}.png` } });
       if (url === `https://queue.fal.run/${FAL_MESH_MODEL}`)
         return json({ status: 'IN_QUEUE', status_url: 'https://q/status', response_url: 'https://q/result' });
       if (url === 'https://q/status') return json({ status: 'COMPLETED' });
@@ -95,9 +98,11 @@ describe('landmark3d', () => {
     expect(model.image).toBe('https://fal.media/img2.jpg');
     expect(devRequests().map((e) => [e.model, e.status, e.error ?? null])).toEqual([
       [FAL_IMAGE_MODEL, 'ok', null],
+      [FAL_MATTE_MODEL, 'ok', null],
       [FAL_MESH_MODEL, 'ok', null],
       [FAL_MESH_MODEL, 'error', 'came back as a flat card, not a model'],
       [FAL_IMAGE_MODEL, 'ok', null],
+      [FAL_MATTE_MODEL, 'ok', null],
       [FAL_MESH_MODEL, 'ok', null],
     ]);
   });
@@ -243,6 +248,7 @@ describe('landmark3d', () => {
     const entries = devRequests();
     expect(entries.map((e) => [e.kind, e.model, e.status])).toEqual([
       ['fal', FAL_IMAGE_MODEL, 'ok'],
+      ['fal', FAL_MATTE_MODEL, 'ok'],
       ['fal', FAL_MESH_MODEL, 'ok'],
     ]);
     const totals = questTotals();
@@ -264,7 +270,7 @@ describe('landmark3d', () => {
     expect(model.glb).toBe('https://fal.media/model.glb');
     expect(slept.slice(0, 2)).toEqual([1000, 2000]);
     expect(model.queuedMs).toBeGreaterThanOrEqual(0);
-    expect(devRequests().map((e) => e.status)).toEqual(['ok', 'ok']);
+    expect(devRequests().map((e) => e.status)).toEqual(['ok', 'ok', 'ok']);
   });
 
   it('puts a refused step in the console as an error, stops the world’s other pieces, and does not ask again this session', async () => {
@@ -334,7 +340,7 @@ describe('landmark3d', () => {
     await generateHubModel('k', world(), 'goods', { ...now, fetchImpl });
     await generateLandmark('k', world(), { ...now, fetchImpl });
     expect(bodies.map((b) => JSON.parse(b).mesh_simplify)).toEqual([0.98, 0.95]);
-    expect(devRequests().map((r) => r.label)).toEqual(['goods', 'goods', 'landmark', 'landmark']);
+    expect(devRequests().map((r) => r.label)).toEqual(['goods', 'goods', 'goods', 'landmark', 'landmark', 'landmark']);
   });
 
   it('keeps a step still running when a new quest clears the console', async () => {
@@ -351,7 +357,25 @@ describe('landmark3d', () => {
     expect(devRequests()).toHaveLength(1);
     release();
     await p;
-    expect(devRequests()).toHaveLength(2);
+    expect(devRequests()).toHaveLength(3);
+  });
+
+  it('gives TRELLIS the picture cut out, and still makes the model when the cut fails', async () => {
+    const meshFrom: string[] = [];
+    const run = async (cut: boolean) => {
+      const inner = falFetch([], cut ? undefined : { url: `https://fal.run/${FAL_MATTE_MODEL}`, status: 500 });
+      const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === `https://queue.fal.run/${FAL_MESH_MODEL}`) meshFrom.push(JSON.parse(String(init?.body)).image_url);
+        return inner(input);
+      }) as typeof fetch;
+      return generateLandmark('k', world({ id: cut ? 'w-cut' : 'w-uncut' }), { ...now, fetchImpl });
+    };
+    await run(true);
+    const model = await run(false);
+    expect(meshFrom).toEqual(['https://fal.media/cut.png', 'https://fal.media/img.jpg']);
+    expect(model.glb).toBe('https://fal.media/model.glb');
+    const failed = devRequests().find((e) => e.model === FAL_MATTE_MODEL && e.status === 'error');
+    expect(failed?.error).toMatch(/^500 .*meshed from the picture as drawn$/);
   });
 });
 
