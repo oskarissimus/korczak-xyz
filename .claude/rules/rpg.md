@@ -2962,3 +2962,30 @@ missing from the table shows `?`, never a guess. A new kind of request the game 
 `window.rpg.scene` (`teleport('marker' | 'npc' | 'spawn')`, `facePosition()` toward the marker,
 `toggleSenses(on?)`, attack, interact) and `window.rpg.state()` (beat, progress, history, ending, chronicle, busy) exist
 for driving a whole quest from a test or the console without a mouse.
+
+#### What the tank will not pay for (security audit, 26 Nov 2026)
+
+The server's keys are the most valuable thing behind the gateway, and a signed-in account with a
+free tank used to reach them with any request the route table let through. Now:
+
+- **`dieselRefusal`** (`utils/rpg/wallet.ts`, read by `dieselPayer` before anything is reserved) is
+  an allowlist of what the game itself sends: fal only for the apps `falCost` prices
+  (`DIESEL_FAL_APPS`) and one image at a time; Gemini and OpenAI only for a priced model, no tools,
+  no fetched files, one candidate, output under `MAX_OUTPUT_TOKENS`; ElevenLabs only speech,
+  dialogue, music of a stated length up to `DIESEL_MUSIC_MAX_MS`, Voice Design, and the voice
+  listings. A refusal is a 403 `diesel-refused` with nothing reserved. A new call site on diesel
+  needs its app or model here, or it fails on every account without a key.
+- **A DELETE of a voice on the server's ElevenLabs account** is let through only for a voice named
+  `rpg · …` (`GAME_VOICE_PREFIX`) in category `generated`, checked on the server against the
+  account before passing it on. Without that, any account could delete the owner's own voices.
+- **The settle has no ceiling.** What a call really cost is taken even past what was reserved, so
+  the balance can go below zero; the next reservation is refused. An overrun used to be free.
+- **A day's cap on all of it**: `rpgDiesel/config.dailyUsd` (default $50), summed over ten shards
+  in `rpgDieselDays/{day}-{i}`. Past it every paid diesel call is a 429 `diesel-daily-cap` and a
+  Sentry event, until Warsaw's midnight.
+- **Three free tanks per address and day** (`grantsPerIp`, `rpgDieselGrants/{ipKey}`), so a script
+  minting accounts does not get $4 each. A fourth account from the same address starts empty.
+- **Replays, frames, self-rigs and SkinTokens** are counted per address or account and day
+  (`functions/src/rpg/dailyCap.ts`, `rpgDailyCaps`), since none of them has a payer.
+- **Paddle**: a sandbox delivery to a project that has a live secret is refused unpoured
+  (`sandbox-refused`), so a sandbox checkout cannot fill a real tank.

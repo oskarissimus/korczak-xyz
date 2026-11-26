@@ -272,3 +272,14 @@ describe('the Paddle webhook', () => {
     expect((await deliver(JSON.stringify({ event_type: 'customer.created', data: {} }))).json.outcome).toBe('ignored');
   });
 });
+
+describe('a live project and the sandbox', () => {
+  it('pours nothing for a sandbox delivery once live secrets exist', async () => {
+    store.set('rpgPaddle/config', { webhookSecret: SECRET, webhookSecrets: ['live-secret'] });
+    resetPaddleIps();
+    const r = await deliver(paid(), sign(paid()), '3.208.120.145');
+    expect(r.status).toBe(200);
+    expect(r.json.outcome).toBe('sandbox-refused');
+    expect(store.get('rpgLedger/u1')).toBeUndefined();
+  });
+});

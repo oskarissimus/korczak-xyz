@@ -34,6 +34,8 @@ vi.mock('../runtime', () => ({
   },
 }));
 vi.mock('../sentry', () => ({ reportError: vi.fn(), flushSentry: vi.fn(async () => {}) }));
+const daily = vi.hoisted(() => ({ left: true }));
+vi.mock('./dailyCap', () => ({ takeDaily: vi.fn(async () => daily.left) }));
 
 import { forgetCachedKeys, gatewayPathOf, handleRpgApi, ledgerWrites } from './gateway';
 
@@ -323,6 +325,20 @@ describe('skin weights (/_skin)', () => {
     expect(String(url)).toMatch(/^https:\/\/skin-weights-.*\.run\.app$/);
     expect(init.headers.Authorization).toBe('Bearer id-token');
     expect(JSON.parse(Buffer.from(init.body).toString())).toEqual(mesh);
+  });
+
+  it('refuses a run past the account’s daily count, before reaching the service', async () => {
+    store.set('accounts/u1', { approved: true });
+    daily.left = false;
+    try {
+      const out = fakeRes();
+      await handleRpgApi(req('/_skin', { body: mesh, headers: { authorization: 'Bearer good' } }), out as any);
+      expect(out.statusCode).toBe(429);
+      expect(JSON.parse(out.body()).reason).toBe('daily-cap');
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      daily.left = true;
+    }
   });
 
   it('wakes the service on a GET from an approved account, sending no mesh', async () => {

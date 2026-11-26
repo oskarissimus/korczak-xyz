@@ -122,6 +122,7 @@ export function inCidrs(ip: string, cidrs: readonly string[]): boolean {
 /** For the tests: forget the cached list. */
 export function resetPaddleIps(): void {
   ipCache = null;
+  secretCache = null;
 }
 
 /** Whether `raw` was signed by one of `secrets` within `MAX_AGE_S` of `nowS`. */
@@ -270,6 +271,15 @@ export async function handlePaddleWebhook(req: Request, res: Response, raw: Buff
       : null;
   if (!env) {
     res.status(401).json({ reason: 'signature' });
+    return;
+  }
+  // A project that takes live money takes no sandbox delivery (security audit, 26 Nov 2026). The
+  // sandbox's client token and prices are public in `paddleConfig.ts` and `custom_data.uid` is the
+  // buyer's to write, so with a sandbox destination pointed here anybody could pay with test card
+  // 4242 and have real diesel poured. Answered 200 so Paddle stops retrying it.
+  if (env === 'sandbox' && secrets.production.length > 0) {
+    reportError('rpgPaddle.sandbox', new Error('paddle: a sandbox delivery reached a live project; nothing poured'));
+    res.status(200).json({ ok: true, outcome: 'sandbox-refused' });
     return;
   }
   let event: PaddleEvent;

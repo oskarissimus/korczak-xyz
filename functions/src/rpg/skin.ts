@@ -12,6 +12,7 @@
 import type { Response } from 'express';
 
 import { db } from '../runtime';
+import { takeDaily } from './dailyCap';
 
 export const SKIN_PATH = '/_skin';
 export const SKIN_URL = process.env.SKIN_WEIGHTS_URL || 'https://skin-weights-1068962621574.europe-central2.run.app';
@@ -60,6 +61,7 @@ export async function handleSkin(uid: string | null, method: string, body: Buffe
   }
   if (!body?.length || body.length > SKIN_MAX_BYTES) throw new SkinRefusal(413, 'size', 'skin weights: the mesh is empty or too big');
   if (!(await approved(uid))) throw new SkinRefusal(403, 'approval', 'skin weights: an approved account only');
+  if (!(await takeDaily('skin', { uid }))) throw new SkinRefusal(429, 'daily-cap', 'skin weights: too many today');
   const answer = await fetch(SKIN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await identityToken(SKIN_URL)}` },

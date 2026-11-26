@@ -43,6 +43,7 @@ import {
   type ReplaysPage,
 } from '../../../korczak-xyz/src/utils/rpg/replay';
 import { RPG_BUCKET, db } from '../runtime';
+import { takeDaily } from './dailyCap';
 
 export class ReplayRefusal extends Error {
   constructor(message: string) {
@@ -62,7 +63,7 @@ async function uidOfToken(token: unknown): Promise<string | null> {
 }
 
 /** One chunk of a session, from the game. Answers 204 whatever it kept; 400 only for a malformed one. */
-export async function keepReplay(res: Response, body: Record<string, unknown>): Promise<void> {
+export async function keepReplay(res: Response, body: Record<string, unknown>, ip = 'unknown'): Promise<void> {
   const id = typeof body.id === 'string' && REPLAY_ID.test(body.id) ? body.id : null;
   const seq = typeof body.seq === 'number' && Number.isInteger(body.seq) && body.seq >= 0 && body.seq < REPLAY_LIMITS.chunks ? body.seq : null;
   if (!id || seq === null) throw new ReplayRefusal('replay: bad id or seq');
@@ -75,6 +76,11 @@ export async function keepReplay(res: Response, body: Record<string, unknown>): 
   const uid = await uidOfToken(body.token);
   const expireAt = new Date(now + REPLAY_LIMITS.days * DAY);
   const session = db.collection(REPLAY_COLLECTION).doc(id);
+  // A new session is counted against the address's day (`dailyCap.ts`); past it, nothing is kept.
+  if (!(await session.get()).exists && !(await takeDaily('replaySessions', { ip }))) {
+    res.status(204).send('');
+    return;
+  }
   const batch = db.batch();
   const record: Record<string, unknown> = {
     id,
@@ -159,7 +165,7 @@ export async function readReplay(id: string): Promise<ReplayDetail | null> {
 }
 
 /** One picture of the screen (`REPLAY_FRAMES`). 204 kept or quietly not; 400 only for a malformed one. */
-export async function keepFrame(res: Response, body: Record<string, unknown>): Promise<void> {
+export async function keepFrame(res: Response, body: Record<string, unknown>, ip = 'unknown'): Promise<void> {
   const id = typeof body.id === 'string' && REPLAY_ID.test(body.id) ? body.id : null;
   const t = typeof body.t === 'number' && Number.isFinite(body.t) && body.t >= 0 && body.t < 7 * DAY ? Math.round(body.t) : null;
   if (!id || t === null || typeof body.jpeg !== 'string') throw new ReplayRefusal('replay: bad frame');
@@ -168,6 +174,10 @@ export async function keepFrame(res: Response, body: Record<string, unknown>): P
   // A JPEG starts FF D8 FF; nothing else is kept, whatever it says it is.
   if (bytes.length < 100 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) throw new ReplayRefusal('replay: not a jpeg');
   const session = db.collection(REPLAY_COLLECTION).doc(id);
+  if (!(await takeDaily('replayFrames', { ip }))) {
+    res.status(204).send('');
+    return;
+  }
   const allowed = await db.runTransaction(async (tx) => {
     const snap = await tx.get(session);
     if (!snap.exists) return false;

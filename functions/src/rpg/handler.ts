@@ -729,8 +729,8 @@ export async function handleRpgDemo(req: Request, res: Response): Promise<void> 
     }
     const body = parseBody(req.body);
     if (body.kind === 'stats') await stats(res, body);
-    else if (body.kind === 'replay') await keepReplay(res, body);
-    else if (body.kind === 'frame') await keepFrame(res, body);
+    else if (body.kind === 'replay') await keepReplay(res, body, callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip));
+    else if (body.kind === 'frame') await keepFrame(res, body, callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip));
     else if (body.kind === 'beat') await beat(req, res, body);
     else if (body.kind === 'world') await world(req, res, body);
     else if (body.kind === 'voice') await clip(req, res, body);

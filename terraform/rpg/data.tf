@@ -158,3 +158,28 @@ resource "google_firestore_field" "rpg_replay_chunks_ttl" {
   ttl_config {}
   index_config {}
 }
+
+/*
+ * Rate-limit buckets (security audit, Nov 2026): `rpgDailyCaps` (replays, frames, self-rigs and
+ * SkinTokens per address or account and day, `functions/src/rpg/dailyCap.ts`) and `rpgDieselGrants`
+ * (free tanks per hashed address, `functions/src/rpg/wallet.ts`). Each carries `expireAt`.
+ */
+resource "google_firestore_field" "rpg_daily_caps_ttl" {
+  project    = local.project_id
+  database   = google_firestore_database.default.name
+  collection = "rpgDailyCaps"
+  field      = "expireAt"
+
+  ttl_config {}
+  index_config {}
+}
+
+resource "google_firestore_field" "rpg_diesel_grants_ttl" {
+  project    = local.project_id
+  database   = google_firestore_database.default.name
+  collection = "rpgDieselGrants"
+  field      = "expireAt"
+
+  ttl_config {}
+  index_config {}
+}

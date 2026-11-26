@@ -209,7 +209,7 @@ describe('diesel', () => {
     expect(reserve.mock.calls[0][1]).toBeCloseTo(0.02);
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Key fal-server');
     await handleRpgApi(req('/queue.fal.run/fal-ai/trellis/requests/abc/status', { method: 'GET', headers: GAME }), fakeRes() as any);
-    expect(reserve.mock.calls[1].slice(1)).toEqual([0, true]);
+    expect(reserve.mock.calls[1].slice(1, 3)).toEqual([0, true]);
     expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Key fal-server');
     // The submit is logged at its list price; the free status poll is not logged at all.
     const fal = logged.mock.calls.map((c) => c[0] as Record<string, unknown>).filter((e) => e.provider === 'fal');
@@ -253,5 +253,48 @@ describe('diesel', () => {
     delete r.headers.origin;
     await handleRpgApi(r, res as any);
     expect(res.statusCode).toBe(401);
+  });
+
+  it('pays for nothing the game does not send: another fal app, four pictures, a tool, a fetched file', async () => {
+    const cases: [string, unknown][] = [
+      ['/fal.run/fal-ai/veo3', { prompt: 'x' }],
+      ['/fal.run/fal-ai/flux/schnell', { prompt: 'x', num_images: 4 }],
+      [BEAT, { contents: [{ parts: [{ text: 'x' }] }], tools: [{ googleSearch: {} }] }],
+      [BEAT, { contents: [{ parts: [{ fileData: { fileUri: 'https://youtube.com/watch?v=x' } }] }] }],
+      ['/generativelanguage.googleapis.com/v1beta/models/some-unpriced-model:generateContent', { contents: [] }],
+      ['/api.elevenlabs.io/v1/music', { prompt: 'x' }],
+    ];
+    for (const [url, body] of cases) {
+      const res = fakeRes();
+      await handleRpgApi(req(url, { headers: GAME, body }), res as any);
+      expect(res.statusCode, url).toBe(403);
+      expect(res.body()).toContain('diesel-refused');
+    }
+    expect(reserve).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('deletes only the game’s own voices on the server key', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ name: 'My cloned voice', category: 'cloned' })));
+    let res = fakeRes();
+    await handleRpgApi(req('/api.elevenlabs.io/v1/voices/abc', { method: 'DELETE', headers: GAME }), res as any);
+    expect(res.statusCode).toBe(403);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    reserve.mockResolvedValueOnce({ ok: true, balanceUsd: 0.9 });
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ name: 'rpg · w1 · Ola · hq', category: 'generated' })));
+    fetchMock.mockResolvedValueOnce(new Response('{}', { headers: { 'content-type': 'application/json' } }));
+    res = fakeRes();
+    await handleRpgApi(req('/api.elevenlabs.io/v1/voices/def', { method: 'DELETE', headers: GAME }), res as any);
+    expect(res.statusCode).toBe(200);
+    expect(fetchMock.mock.calls[2][1].method).toBe('DELETE');
+  });
+
+  it('says so when the day’s cap is reached', async () => {
+    reserve.mockResolvedValueOnce({ ok: false, balanceUsd: 3, reason: 'daily-cap' });
+    const res = fakeRes();
+    await handleRpgApi(req(BEAT, { headers: GAME, body: { contents: [{ parts: [{ text: 'x' }] }] } }), res as any);
+    expect(res.statusCode).toBe(429);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

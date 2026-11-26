@@ -68,7 +68,7 @@ import {
   type GatewayTarget,
 } from '../../../korczak-xyz/src/utils/rpg/gatewayRoutes';
 import { ASSET_HEADER, FRESH_HEADER, KEEP_HEADER, REUSED_HEADER } from '../../../korczak-xyz/src/utils/rpg/assetStore';
-import { dayKey } from '../demo/limits';
+import { callerIp, dayKey } from '../demo/limits';
 import { assetContext, handleSelfRig, keepAudio, keepJson, serveReused, serveReusedQueue, type AssetContext } from './assets';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { SKIN_PATH, SkinRefusal, handleSkin } from './skin';
@@ -80,8 +80,10 @@ import { handlePaddleWebhook } from './paddle';
 import { PADDLE_WEBHOOK_PATH } from '../../../korczak-xyz/src/utils/rpg/paddle';
 import {
   DIESEL_KEYS,
+  GAME_VOICE_PREFIX,
   NO_DIESEL,
   WALLET_PATH,
+  dieselRefusal,
   dieselReservation,
   dieselRoute,
   isFollowUp,
@@ -210,9 +212,17 @@ export async function dieselPayer(req: Request, target: GatewayTarget, body: Buf
   if (!uid) return null;
   const key = (await cachedServerKeys())[name];
   if (!key) return null;
+  const json = jsonOf(body);
+  const refused = dieselRefusal(target, req.method, json);
+  if (refused) throw new GatewayRefusal(403, 'diesel-refused', `rpg gateway: diesel does not pay for this request (${refused})`);
+  if (req.method.toUpperCase() === 'DELETE') await dieselVoiceDelete(target, key);
   const free = isFollowUp(target, req.method);
-  const reservedUsd = free ? 0 : dieselReservation(target, req.method, jsonOf(body), body?.length ?? 0);
-  const r = await reserveDiesel(uid, reservedUsd, free);
+  const reservedUsd = free ? 0 : dieselReservation(target, req.method, json, body?.length ?? 0);
+  const r = await reserveDiesel(uid, reservedUsd, free, { ip: callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip) });
+  if (!r.ok && 'reason' in r && r.reason === 'daily-cap') {
+    reportError('rpgApi.diesel.dailyCap', new Error('diesel: the day\'s cap on the server\'s keys is reached'));
+    throw new GatewayRefusal(429, 'diesel-daily-cap', 'rpg gateway: diesel is resting until tomorrow (the day\'s limit is reached)');
+  }
   if (!r.ok) {
     throw new GatewayRefusal(
       402,
@@ -221,6 +231,22 @@ export async function dieselPayer(req: Request, target: GatewayTarget, body: Buf
     );
   }
   return { key, uid, kind: 'diesel', reservedUsd };
+}
+
+/**
+ * A voice deleted on the server's ElevenLabs key must be one the game designed (`GAME_VOICE_PREFIX`,
+ * category `generated`): the game makes room among its own voices that way (`voiceDesign.ts`), and
+ * without this check any account with a drop of diesel could empty the owner's voice library
+ * (security audit, 26 Nov 2026).
+ */
+async function dieselVoiceDelete(target: GatewayTarget, key: string): Promise<void> {
+  const id = /^\/v1\/voices\/(\w+)$/.exec(target.path)?.[1];
+  if (target.provider !== 'elevenlabs' || !id) throw new GatewayRefusal(403, 'diesel-refused', 'rpg gateway: diesel deletes nothing but the game\'s voices');
+  const r = await fetch(`https://api.elevenlabs.io/v1/voices/${id}`, { headers: credentialHeaders('elevenlabs', key) });
+  const voice = r.ok ? ((await r.json().catch(() => ({}))) as { name?: unknown; category?: unknown }) : {};
+  if (!(typeof voice.name === 'string' && voice.name.startsWith(GAME_VOICE_PREFIX) && voice.category === 'generated')) {
+    throw new GatewayRefusal(403, 'diesel-refused', 'rpg gateway: diesel deletes nothing but the game\'s voices');
+  }
 }
 
 /** The server's keys, kept a minute per instance like an account's (a fal.ai job is polled every two seconds). */
@@ -661,7 +687,7 @@ async function passOnDiesel(req: Request, res: Response, target: GatewayTarget, 
     spent = res.headersSent ? null : 0;
     throw e;
   } finally {
-    if (who.uid && reserved > 0) await settleDiesel(who.uid, reserved, spent).catch((e) => reportError('rpgApi.diesel', e, { provider: target.provider }));
+    if (who.uid && (reserved > 0 || (spent ?? 0) > 0)) await settleDiesel(who.uid, reserved, spent).catch((e) => reportError('rpgApi.diesel', e, { provider: target.provider }));
   }
 }
 
@@ -670,7 +696,7 @@ async function wallet(req: Request, res: Response): Promise<void> {
   const uid = await uidOf(req);
   if (!uid) throw new GatewayRefusal(401, 'auth', 'rpg wallet: sign in first');
   res.set('Cache-Control', 'no-store');
-  res.status(200).json(await walletStatus(uid));
+  res.status(200).json(await walletStatus(uid, { ip: callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip) }));
 }
 
 export async function handleRpgApi(req: Request, res: Response): Promise<void> {

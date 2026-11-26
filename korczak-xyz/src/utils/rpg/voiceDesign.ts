@@ -37,9 +37,10 @@
 import { spokenText } from './audioTags';
 import type { Lang } from './quest';
 import { languageName } from './language';
+import { GAME_VOICE_PREFIX } from './wallet';
 
 export const DESIGN_MODEL = 'eleven_multilingual_ttv_v2';
-const PREFIX = 'rpg · ';
+const PREFIX = GAME_VOICE_PREFIX;
 /** The game's own voices kept on the account; the rest of the slots stay free for the owner. */
 export const KEEP = 24;
 

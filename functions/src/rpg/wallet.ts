@@ -33,6 +33,7 @@ import {
   type SubscriptionView,
 } from '../../../korczak-xyz/src/utils/rpg/paddle';
 import { readServerKeys } from './admin';
+import { dayKey, ipKey } from '../demo/limits';
 import { db } from '../runtime';
 
 function walletDoc(uid: string) {
@@ -43,34 +44,103 @@ function configDoc() {
   return db.collection(DIESEL_CONFIG_DOC[0]).doc(DIESEL_CONFIG_DOC[1]);
 }
 
-/** The first tank, kept a minute per instance: it is read on every request on diesel. */
-let grantCache: { at: number; usd: number } | null = null;
+/** The panel's diesel settings, kept a minute per instance: they are read on every request on diesel. */
+let configCache: { at: number; data: Record<string, unknown> | undefined } | null = null;
+async function dieselConfig(): Promise<Record<string, unknown> | undefined> {
+  if (configCache && Date.now() - configCache.at < 60_000) return configCache.data;
+  const data = (await configDoc().get()).data();
+  configCache = { at: Date.now(), data };
+  return data;
+}
+
+/** The first tank. */
 export async function grantUsd(): Promise<number> {
-  if (grantCache && Date.now() - grantCache.at < 60_000) return grantCache.usd;
-  const usd = grantOf((await configDoc().get()).data());
-  grantCache = { at: Date.now(), usd };
+  return grantOf(await dieselConfig());
+}
+
+/**
+ * How many first tanks one address may pour in a Warsaw day (security audit, 26 Nov 2026). Signing up
+ * is one request with nothing to stop a script, and every new account came with $4 of the server's
+ * keys; past this many, a new account from that address starts empty (and is granted on a later day or
+ * from another address). `grantsPerIp` on `rpgDiesel/config` overrides it.
+ */
+export const GRANTS_PER_IP = 3;
+
+/**
+ * What diesel may spend on the server's keys in a Warsaw day, all accounts together, unless
+ * `dailyUsd` on `rpgDiesel/config` says otherwise: the backstop the demo has always had (`dailyUsd`
+ * there), so a hole nobody has found yet costs a day's cap and not a wallet.
+ */
+export const DEFAULT_DAILY_USD = 50;
+const DAY_SHARDS = 10;
+const DAYS_COLLECTION = 'rpgDieselDays';
+const GRANTS_COLLECTION = 'rpgDieselGrants';
+
+function numberOr(v: unknown, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+
+/** Today's diesel spend across every account, read from its shards and kept 30 s per instance. */
+let dayCache: { at: number; day: string; usd: number } | null = null;
+async function spentToday(day: string): Promise<number> {
+  if (dayCache && dayCache.day === day && Date.now() - dayCache.at < 30_000) return dayCache.usd;
+  const shards = await Promise.all(
+    Array.from({ length: DAY_SHARDS }, (_, i) => db.collection(DAYS_COLLECTION).doc(`${day}-${i}`).get()),
+  );
+  const usd = shards.reduce((n, s) => n + numberOr(s.data()?.usd, 0), 0);
+  dayCache = { at: Date.now(), day, usd };
   return usd;
 }
 
-export type Reservation = { ok: true; balanceUsd: number } | { ok: false; balanceUsd: number };
+/** For tests. */
+export function forgetDieselCaches(): void {
+  configCache = null;
+  dayCache = null;
+}
+
+export type Reservation =
+  | { ok: true; balanceUsd: number }
+  | { ok: false; balanceUsd: number; reason?: 'daily-cap' };
+
+/** Who is asking, where the first tank is concerned: the caller's address, when the gateway knows it. */
+export interface Asker {
+  ip?: string;
+}
 
 /**
- * Takes `usd` out of the tank, granting the first tank if the account never had one. Refused when it
- * does not fit; `free` lets a follow-up of paid work through on any balance (nothing is taken).
+ * Takes a request's worst case out of the tank, or says it does not fit. An account never granted is
+ * granted on the way — unless its address has poured `GRANTS_PER_IP` today, when it starts at zero and
+ * nothing is written, so the grant is still to come. A follow-up (`free`) only needs the account to
+ * exist. Refused outright while today's spend across all accounts is at the day's cap.
  */
-export async function reserveDiesel(uid: string, usd: number, free = false): Promise<Reservation> {
-  const grant = await grantUsd();
+export async function reserveDiesel(uid: string, usd: number, free = false, asker: Asker = {}): Promise<Reservation> {
+  const config = await dieselConfig();
+  const grant = grantOf(config);
+  const day = dayKey();
+  if (!free && usd > 0 && (await spentToday(day)) >= numberOr(config?.dailyUsd, DEFAULT_DAILY_USD)) {
+    return { ok: false, balanceUsd: balanceOf((await walletDoc(uid).get()).data()) ?? 0, reason: 'daily-cap' };
+  }
   const ref = walletDoc(uid);
+  const grants = asker.ip ? db.collection(GRANTS_COLLECTION).doc(ipKey(asker.ip, day)) : null;
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const known = balanceOf(snap.data());
-    const balance = known ?? grant;
-    const fresh = known === null ? { [GRANTED_FIELD]: Date.now(), dieselGrantUsd: grant } : {};
+    let fresh: Record<string, unknown> = {};
+    let balance = known ?? 0;
+    if (known === null) {
+      const poured = grants ? numberOr((await tx.get(grants)).data()?.count, 0) : 0;
+      if (poured >= numberOr(config?.grantsPerIp, GRANTS_PER_IP)) {
+        // Starts empty, writes nothing: granted later, on another day or from another address.
+        return free ? { ok: true as const, balanceUsd: 0 } : { ok: false as const, balanceUsd: 0 };
+      }
+      balance = grant;
+      fresh = { [GRANTED_FIELD]: Date.now(), dieselGrantUsd: grant };
+      if (grants) tx.set(grants, { count: poured + 1, day, expireAt: new Date(Date.now() + 2 * 86_400_000) }, { merge: true });
+    }
     if (free) {
       if (known === null) tx.set(ref, { [BALANCE_FIELD]: balance, ...fresh }, { merge: true });
       return { ok: true as const, balanceUsd: balance };
     }
-    // Nothing on an empty tank, not even a model that costs nothing: diesel is the gate.
     if (!(balance > 0) || usd > balance) {
       if (known === null) tx.set(ref, { [BALANCE_FIELD]: balance, ...fresh }, { merge: true });
       return { ok: false as const, balanceUsd: balance };
@@ -81,21 +151,30 @@ export async function reserveDiesel(uid: string, usd: number, free = false): Pro
 }
 
 /**
- * Settles a reservation: what it cost is spent (never more than was reserved), the rest goes back.
- * `actual` null — a price nobody knows, a stream cut before its usage — keeps the whole reservation.
+ * Settles a reservation at what the request cost: the rest goes back, and a cost over the reservation
+ * is taken too, so the tank may end below zero (read as empty, `balanceOf`) until it is filled. It
+ * used to stop at the reservation, which made the owner pay every overrun (security audit, 26 Nov
+ * 2026). An unknown cost keeps the whole reservation. What was spent is added to the day's total.
  */
 export async function settleDiesel(uid: string, reserved: number, actual: number | null): Promise<void> {
-  const spent = actual === null ? reserved : Math.min(reserved, Math.max(0, actual));
-  const refund = reserved - spent;
-  // The month's delivery is spent first (`SUBSCRIPTION`): what it held goes down by what was spent.
-  // It may run below zero for an account with none; it is read clamped (`subLeftOf`).
+  const spent = actual === null ? reserved : Math.max(0, actual);
+  const back = reserved - spent;
   const write: Record<string, unknown> = {
     dieselSpentUsd: FieldValue.increment(spent),
     [SUB_BALANCE_FIELD]: FieldValue.increment(-spent),
     dieselUpdatedAt: Date.now(),
   };
-  if (refund > 0) write[BALANCE_FIELD] = FieldValue.increment(refund);
+  if (back !== 0) write[BALANCE_FIELD] = FieldValue.increment(back);
   await walletDoc(uid).set(write, { merge: true });
+  if (spent > 0) {
+    const day = dayKey();
+    const shard = Math.floor(Math.random() * DAY_SHARDS);
+    await db
+      .collection(DAYS_COLLECTION)
+      .doc(`${day}-${shard}`)
+      .set({ usd: FieldValue.increment(spent), day, expireAt: new Date(Date.now() + 30 * 86_400_000) }, { merge: true });
+    if (dayCache && dayCache.day === day) dayCache.usd += spent;
+  }
 }
 
 /** Adds to an account's tank (the panel's top-up, an admin's free canister; a purchase is `creditPurchase`). Grants the first tank too. */
@@ -116,8 +195,8 @@ export async function topUpDiesel(uid: string, usd: number): Promise<number> {
 }
 
 /** `/wallet`: what is left (the first tank granted on the way), and which keys diesel can stand in for. */
-export async function walletStatus(uid: string): Promise<WalletStatus> {
-  const [reservation, keys, grant] = await Promise.all([reserveDiesel(uid, 0, true), readServerKeys(), grantUsd()]);
+export async function walletStatus(uid: string, asker: Asker = {}): Promise<WalletStatus> {
+  const [reservation, keys, grant] = await Promise.all([reserveDiesel(uid, 0, true, asker), readServerKeys(), grantUsd()]);
   return {
     balanceUsd: reservation.balanceUsd,
     grantUsd: grant,

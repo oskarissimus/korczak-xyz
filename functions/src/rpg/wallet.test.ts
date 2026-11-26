@@ -33,12 +33,13 @@ vi.mock('../runtime', () => {
   };
 });
 
-import { reserveDiesel, settleDiesel, topUpDiesel, walletStatus } from './wallet';
+import { forgetDieselCaches, reserveDiesel, settleDiesel, topUpDiesel, walletStatus } from './wallet';
 
 // The tank these tests pour is the panel's $1, not the default sign-up bonus (`grantOf` tests that).
 beforeEach(() => {
   store.clear();
   store.set('rpgDiesel/config', { grantUsd: 1 });
+  forgetDieselCaches();
 });
 
 describe('the diesel tank', () => {
@@ -60,17 +61,45 @@ describe('the diesel tank', () => {
     expect((await reserveDiesel('u1', 0, true)).ok).toBe(true);
   });
 
-  it('settles at what it cost, never more than reserved, and keeps all of an unknown price', async () => {
+  it('settles at what it cost, an overrun included, and keeps all of an unknown price', async () => {
     await reserveDiesel('u1', 0.2);
     await settleDiesel('u1', 0.2, 0.05);
     expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(0.95);
     await reserveDiesel('u1', 0.1);
     await settleDiesel('u1', 0.1, 0.5);
-    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(0.85);
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(0.45);
     await reserveDiesel('u1', 0.1);
     await settleDiesel('u1', 0.1, null);
-    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(0.75);
-    expect(store.get('rpgLedger/u1')?.dieselSpentUsd).toBeCloseTo(0.25);
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(0.35);
+    expect(store.get('rpgLedger/u1')?.dieselSpentUsd).toBeCloseTo(0.65);
+  });
+
+  it('goes below zero on an overrun and then refuses until filled', async () => {
+    await reserveDiesel('u1', 0.9);
+    await settleDiesel('u1', 0.9, 1.5);
+    expect(store.get('rpgLedger/u1')?.dieselUsd).toBeCloseTo(-0.5);
+    expect((await reserveDiesel('u1', 0.01)).ok).toBe(false);
+    expect((await walletStatus('u1')).balanceUsd).toBe(0);
+  });
+
+  it('pours a first tank only so many times a day from one address', async () => {
+    for (const uid of ['a', 'b', 'c']) expect((await walletStatus(uid, { ip: '9.9.9.9' })).balanceUsd).toBe(1);
+    expect((await walletStatus('d', { ip: '9.9.9.9' })).balanceUsd).toBe(0);
+    expect(store.get('rpgLedger/d')).toBeUndefined();
+    expect((await reserveDiesel('d', 0.1, false, { ip: '9.9.9.9' })).ok).toBe(false);
+    // From another address the grant still comes.
+    expect((await walletStatus('d', { ip: '8.8.8.8' })).balanceUsd).toBe(1);
+  });
+
+  it('stops every account once the day\'s spend reaches the cap', async () => {
+    store.set('rpgDiesel/config', { grantUsd: 1, dailyUsd: 0.5 });
+    forgetDieselCaches();
+    await reserveDiesel('u1', 0.4);
+    await settleDiesel('u1', 0.4, 0.6);
+    const r = await reserveDiesel('u2', 0.1);
+    expect(r).toMatchObject({ ok: false, reason: 'daily-cap' });
+    // A follow-up of work already paid for still goes through.
+    expect((await reserveDiesel('u2', 0, true)).ok).toBe(true);
   });
 
   it('tops up on top of the first tank', async () => {

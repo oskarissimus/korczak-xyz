@@ -1,6 +1,18 @@
 # everyrpg.korczak.xyz. The same cache tiers as public/_headers on korczak.xyz, minus what this site
 # does not have (no service worker, no fonts).
 
+# Security headers on every page (security audit, Nov 2026). Deliberately not a script CSP: the
+# site loads Firebase, Sentry, map tiles and YouTube from many origins, and a CSP that blocks one of
+# them breaks an app silently. What is here costs nothing: no other site may frame this one (the
+# clickjacking half of CSP), no <base> or plugin injection, the browser keeps HTTPS for a year, it
+# never guesses a MIME type, and a link out does not carry the full URL with it.
+/*
+  Strict-Transport-Security: max-age=31536000
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'
+  X-Frame-Options: SAMEORIGIN
+
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
 

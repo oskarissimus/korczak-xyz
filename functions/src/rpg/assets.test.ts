@@ -47,6 +47,8 @@ vi.mock('../runtime', () => ({
   },
 }));
 vi.mock('../sentry', () => ({ reportError: vi.fn(), flushSentry: vi.fn(async () => {}) }));
+const daily = vi.hoisted(() => ({ left: true }));
+vi.mock('./dailyCap', () => ({ takeDaily: vi.fn(async () => daily.left) }));
 
 import { handleRpgApi } from './gateway';
 import { requestFingerprint } from '../../../korczak-xyz/src/utils/rpg/assetStore';
@@ -271,5 +273,19 @@ describe('kept assets', () => {
     expect([...Buffer.concat(get.chunks)]).toEqual([5, 6, 7]);
     const [[, item]] = items();
     expect(item).toMatchObject({ kind: 'self-rig', model: 'self-rig/voxel', usd: 0 });
+  });
+
+  it('refuses a rig past the account’s daily count, keeping nothing', async () => {
+    daily.left = false;
+    try {
+      const put = fakeRes();
+      const r = req(`/_assets/self-rig/${'b'.repeat(40)}`, { method: 'PUT' });
+      r.rawBody = Buffer.from([1, 2, 3]);
+      await handleRpgApi(r, put);
+      expect(put.statusCode).toBe(429);
+      expect(items().length).toBe(0);
+    } finally {
+      daily.left = true;
+    }
   });
 });

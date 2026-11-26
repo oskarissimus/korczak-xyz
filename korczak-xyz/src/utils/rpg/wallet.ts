@@ -14,8 +14,10 @@
  *
  * THE SAME RESERVATION AS THE DEMO'S (`demoLimits.ts`): before a request is passed on, its worst case
  * is taken out of the tank in a transaction, and afterwards the difference to what it really cost is
- * given back. So the tank cannot go below zero, only approach it; a request whose price is unknown,
- * or a stream cut before its usage arrived, keeps the reservation.
+ * given back — or, when it cost more than reserved, taken too, so the tank may end below zero and
+ * refuses the next request until it is filled (security audit, 26 Nov 2026: the overrun used to be
+ * the owner's). A request whose price is unknown, or a stream cut before its usage arrived, keeps the
+ * reservation. And diesel pays only for requests shaped as the game sends them (`dieselRefusal`).
  */
 
 import { MAX_OUTPUT_TOKENS, beatReservation } from './demoLimits';
@@ -98,13 +100,99 @@ export function dieselRoute(target: GatewayTarget, method: string): boolean {
     case 'openai':
       return m === 'POST' && target.path === '/v1/chat/completions';
     case 'elevenlabs':
-      return target.path !== '/v1/user' && target.path !== '/v1/user/subscription' && target.path !== '/v1/voices';
+      // What the game itself does on the server's ElevenLabs key: speak, compose, design a voice and
+      // keep its own designed voices tidy. Listing and deleting are for the game's voices only, which
+      // the gateway checks before a DELETE goes on (`dieselVoiceDelete` in `functions/src/rpg/gateway.ts`).
+      if (m === 'POST') return /^\/v1\/(?:text-to-speech\/\w+(?:\/stream)?|text-to-dialogue|music(?:\/stream)?|text-to-voice(?:\/design)?)$/.test(target.path);
+      if (m === 'GET') return target.path === '/v2/voices' || target.path === '/v1/shared-voices';
+      return m === 'DELETE' && /^\/v1\/voices\/\w+$/.test(target.path);
     case 'fal':
       return true;
     default:
       return false;
   }
 }
+
+/** The name every voice the game designs carries (`voiceDesign.ts`); diesel deletes no other. */
+export const GAME_VOICE_PREFIX = 'rpg · ';
+
+/** The longest score diesel composes: the game asks for `MUSIC_MS` (2 min). */
+export const DIESEL_MUSIC_MAX_MS = 180_000;
+
+/** A fal.ai app's namespace, the first two segments (`fal-ai/meshy`), which its queue follow-ups share. */
+function falNamespace(app: string): string {
+  return app.split('/').slice(0, 2).join('/');
+}
+
+/**
+ * What diesel will not pay for, in words, or null when it may (security audit, 26 Nov 2026).
+ *
+ * A reservation is a guess made from the request's own body, which whoever sends it writes. So diesel
+ * pays only for what the game itself asks for, in the shape it asks for it: fal.ai apps with a price
+ * in `falCost` (any other app was a $0.25 reservation for a video costing dollars), one picture at a
+ * time, models with a list price, one answer per request, no tools, no fetched files (a YouTube link
+ * in `fileData` is a few characters in the body and a million tokens at the model), and a score of a
+ * stated length (an absent `music_length_ms` priced it at $0). Everything here the game never sends.
+ */
+export function dieselRefusal(target: GatewayTarget, method: string, body: Record<string, unknown>): string | null {
+  const m = method.toUpperCase();
+  const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v) : NaN);
+  if (target.provider === 'fal') {
+    if (target.host === 'rest.alpha.fal.ai') return null;
+    const app = target.path.slice(1);
+    if (isFalFollowUp(target.path) || m !== 'POST') {
+      const ns = falNamespace(app);
+      return DIESEL_FAL_APPS.some((a) => falNamespace(a) === ns) ? null : `fal.ai app ${ns} is not one the game uses`;
+    }
+    if (!(DIESEL_FAL_APPS as readonly string[]).includes(app)) return `fal.ai app ${app} is not one the game uses`;
+    if (body.num_images !== undefined && num(body.num_images) !== 1) return 'one picture at a time';
+    return null;
+  }
+  if (target.provider === 'google') {
+    const model = /^\/v1beta\/models\/([^:]+):/.exec(target.path)?.[1] ?? '';
+    if (!GEMINI_IMAGE_RATES[model] && beatReservation(model, 0) === null) return `model ${model} has no price`;
+    if (body.tools !== undefined || body.toolConfig !== undefined) return 'no tools';
+    if (JSON.stringify(body.contents ?? '').includes('"fileData"') || JSON.stringify(body.contents ?? '').includes('"file_data"')) return 'no fetched files';
+    const config = (body.generationConfig ?? body.generation_config ?? {}) as Record<string, unknown>;
+    if (config.candidateCount !== undefined && num(config.candidateCount) > 1) return 'one answer per request';
+    if (config.maxOutputTokens !== undefined && !(num(config.maxOutputTokens) <= MAX_OUTPUT_TOKENS)) return `at most ${MAX_OUTPUT_TOKENS} output tokens`;
+    return null;
+  }
+  if (target.provider === 'openai') {
+    const model = typeof body.model === 'string' ? body.model : '';
+    if (!tokenPrice(model)) return `model ${model || '?'} has no price`;
+    if (body.tools !== undefined || body.functions !== undefined) return 'no tools';
+    if (body.n !== undefined && num(body.n) > 1) return 'one answer per request';
+    for (const k of ['max_tokens', 'max_completion_tokens']) {
+      if (body[k] !== undefined && !(num(body[k]) <= MAX_OUTPUT_TOKENS)) return `at most ${MAX_OUTPUT_TOKENS} output tokens`;
+    }
+    return null;
+  }
+  if (target.provider === 'elevenlabs' && m === 'POST' && target.path.startsWith('/v1/music')) {
+    const ms = num(body.music_length_ms);
+    return ms > 0 && ms <= DIESEL_MUSIC_MAX_MS ? null : `a score of 1 ms to ${DIESEL_MUSIC_MAX_MS / 1000} s, stated`;
+  }
+  return null;
+}
+
+/** The fal.ai apps the game asks for: exactly those `falCost` prices. */
+export const DIESEL_FAL_APPS = [
+  'fal-ai/flux/schnell',
+  'fal-ai/flux/dev',
+  'fal-ai/flux-2',
+  'fal-ai/nano-banana',
+  'fal-ai/nano-banana-2',
+  'fal-ai/nano-banana-2.1',
+  'fal-ai/nano-banana-lite',
+  'fal-ai/trellis',
+  'fal-ai/trellis-2',
+  'tripo3d/tripo/v2.5/image-to-3d',
+  'fal-ai/hunyuan3d/v2',
+  'fal-ai/meshy/rigging',
+  'fal-ai/meshy/v6/image-to-3d',
+  'fal-ai/meshy/v6/text-to-3d',
+  'fal-ai/birefnet/v2',
+] as const;
 
 /**
  * The most this request can cost, reserved before it is made: a clip, the score and a fal.ai job

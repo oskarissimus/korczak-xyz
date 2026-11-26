@@ -45,6 +45,7 @@ import {
 } from '../../../korczak-xyz/src/utils/rpg/assetStore';
 import { COST_HEADER, type GatewayTarget } from '../../../korczak-xyz/src/utils/rpg/gatewayRoutes';
 import { RPG_BUCKET, db } from '../runtime';
+import { takeDaily } from './dailyCap';
 import { reportError } from '../sentry';
 
 /** Larger than anything a provider answers the game with; a bound, not a budget. */
@@ -447,6 +448,10 @@ export async function handleSelfRig(uid: string, id: string, method: string, bod
   }
   if (method !== 'PUT' || !body?.length || body.length > 16 * 1024 * 1024) {
     res.status(400).json({ reason: 'body', error: { message: 'rpg assets: a rig is PUT as its bytes' } });
+    return;
+  }
+  if (!(await takeDaily('selfRig', { uid }))) {
+    res.status(429).json({ reason: 'daily-cap', error: { message: 'rpg assets: too many rigs kept today' } });
     return;
   }
   let params: Record<string, unknown> = {};
