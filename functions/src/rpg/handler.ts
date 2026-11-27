@@ -36,7 +36,7 @@ import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 
-import { tokenCost, tokenPrice, USD_PER_VOICE_CREDIT, voiceCreditsPerChar } from '../../../korczak-xyz/src/utils/rpg/cost';
+import { tokenCost, tokenPrice, voiceRateText, voiceCreditsPerChar } from '../../../korczak-xyz/src/utils/rpg/cost';
 import { safeHeaders, tokenBasis, type LoggedUsage, type PriceSource } from '../../../korczak-xyz/src/utils/rpg/requestLog';
 import type { GatewayProvider } from '../../../korczak-xyz/src/utils/rpg/gatewayRoutes';
 import { keptBody, logRequest } from './requestLog';
@@ -618,7 +618,7 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
     const answered = upstream;
     const clipLog = (status: number, bytes: Buffer, usd: number) => {
       const credits = Number(answered.headers.get('character-cost') ?? NaN);
-      const perK = `$${Math.round(USD_PER_VOICE_CREDIT * 1e9) / 1e6}/1k credits`;
+      const perK = voiceRateText();
       return logDemoRequest({
         at: started,
         ip: ipKey(ip, day),

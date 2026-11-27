@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatUsd, tokenCost, tokenPrice } from './cost';
+import { formatUsd, musicUsd, tokenCost, tokenPrice, usdPerVoiceCredit, voiceCost } from './cost';
 import { voiceCredits } from './devlog';
 
 describe('cost', () => {
@@ -21,5 +21,23 @@ describe('cost', () => {
   it('takes ElevenLabs’ own credit count when the response gives one', () => {
     expect(voiceCredits(100, '42')).toBe(42);
     expect(voiceCredits(100, null)).toBe(50);
+  });
+});
+
+describe('the ElevenLabs rate by day', () => {
+  const before = Date.parse('2026-12-16T23:59:00Z');
+  const after = Date.parse('2026-12-17T00:00:00Z');
+
+  it('spreads the Creator fee over its 121k credits until the switch, the API list price after', () => {
+    expect(usdPerVoiceCredit(before)).toBeCloseTo(22 / 121_000, 12);
+    expect(usdPerVoiceCredit(after)).toBeCloseTo(0.08 / 1000, 12);
+    // A Flash character is half a credit: $0.04 per 1k characters on the API pricing.
+    expect(voiceCost(500, after)).toBeCloseTo(0.04, 10);
+  });
+
+  it('prices a score by its credits before the switch and per minute after', () => {
+    expect(musicUsd(90, null, before)).toBeCloseTo((1350 * 22) / 121_000, 10);
+    expect(musicUsd(90, 1200, before)).toBeCloseTo((1200 * 22) / 121_000, 10);
+    expect(musicUsd(90, 1200, after)).toBeCloseTo(0.225, 10);
   });
 });

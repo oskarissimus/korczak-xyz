@@ -67,7 +67,10 @@ describe('beatReservation', () => {
   });
 
   it('prices a clip by its length', () => {
-    expect(clipCost(200)).toBeCloseTo((200 * 0.5 * 22) / 300_000);
+    // The legacy Creator credits until 17 Dec 2026, the API list price ($0.04 per 1k on Flash) after.
+    expect(clipCost(200, 'eleven_flash_v2_5', Date.parse('2026-12-01'))).toBeCloseTo((200 * 0.5 * 22) / 121_000, 10);
+    expect(clipCost(200, 'eleven_flash_v2_5', Date.parse('2026-12-17'))).toBeCloseTo((200 * 0.04) / 1000, 10);
+    expect(clipCost(200, 'eleven_v4', Date.parse('2026-12-17'))).toBeCloseTo((200 * 0.08) / 1000, 10);
   });
 });
 

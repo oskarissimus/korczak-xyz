@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { tokenCost, USD_PER_VOICE_CREDIT } from './cost';
+import { musicUsd, tokenCost, usdPerVoiceCredit } from './cost';
 import { FAL_PRICES, imageCost } from './falPrompts';
 import {
   COST_EVENT,
@@ -78,11 +78,11 @@ describe('prices', () => {
 
   it('prices a clip by its characters and the score by its length, before it is made', () => {
     const tts = gatewayTarget('/api.elevenlabs.io/v1/text-to-speech/v1', 'POST')!;
-    expect(costUpfront(tts, { text: 'x'.repeat(200), model_id: 'eleven_flash_v2_5' })).toBeCloseTo(100 * USD_PER_VOICE_CREDIT);
+    expect(costUpfront(tts, { text: 'x'.repeat(200), model_id: 'eleven_flash_v2_5' })).toBeCloseTo(100 * usdPerVoiceCredit());
     const dialogue = gatewayTarget('/api.elevenlabs.io/v1/text-to-dialogue', 'POST')!;
-    expect(costUpfront(dialogue, { inputs: [{ text: 'x'.repeat(50) }], model_id: 'eleven_v3' })).toBeCloseTo(50 * USD_PER_VOICE_CREDIT);
+    expect(costUpfront(dialogue, { inputs: [{ text: 'x'.repeat(50) }], model_id: 'eleven_v3' })).toBeCloseTo(50 * usdPerVoiceCredit());
     const music = gatewayTarget('/api.elevenlabs.io/v1/music/stream', 'POST')!;
-    expect(costUpfront(music, { music_length_ms: 60_000 })).toBeCloseTo(900 * USD_PER_VOICE_CREDIT);
+    expect(costUpfront(music, { music_length_ms: 60_000 })).toBeCloseTo(musicUsd(60));
   });
 
   it('charges a fal.ai job when it is asked for, not each time it is followed', () => {
@@ -96,7 +96,7 @@ describe('prices', () => {
   });
 
   it('reads ElevenLabs’ own count where it gives one', () => {
-    expect(voiceCostFromHeader('100')).toBeCloseTo(100 * USD_PER_VOICE_CREDIT);
+    expect(voiceCostFromHeader('100')).toBeCloseTo(100 * usdPerVoiceCredit());
     expect(voiceCostFromHeader(null)).toBeNull();
   });
 });

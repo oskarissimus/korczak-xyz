@@ -2035,8 +2035,8 @@ provider's words verbatim beside the normalised price per request and the diesel
   `CHECKED`, the normalised price for a typical request computed by **the same functions** that price
   a real one (a test holds the list equal to `PER_MILLION` and to `falCost`'s cases), gross = net +
   23% VAT, litres from net. Where the verbatim and the code disagree, the row carries a red note — on
-  10 Nov 2026: ElevenLabs' Creator is now $22 for 121k credits against the 300k `USD_PER_VOICE_CREDIT`
-  assumes; Hunyuan3D $0.16 against $0.48; text-to-3D adds a rig; nano-banana-lite is "$1 per unit".
+  10 Nov 2026: ElevenLabs' Creator was $22 for 121k credits against the 300k the code assumed (fixed
+  27 Nov, `VOICE_PRICES` below); Hunyuan3D $0.16 against $0.48; text-to-3D adds a rig; nano-banana-lite is "$1 per unit".
 - **Announced price changes apply on their day** (`PRICE_CHANGES` in `cost.ts`, `tokenPrice(model,
   at)`): Gemini 4 Argon doubles on 1 Dec 2026, 3.8/3.6 Flash on 1 Jan 2027 — so the ledger, diesel and
   the log move without a deploy.
@@ -2245,11 +2245,23 @@ the price of a world or a beat is in it too."
   9 Nov 2026 they priced only the model's words — ~1.9 L for a world, ~0.9 L for a quest — while the
   ledger measured $0.41–0.72 for a world and its first quest, most of it ElevenLabs and fal.ai (owner:
   "massively underpriced"). Now (`diesel.ts`): a step is 8k in, 1.2k out, 0.8k thinking on the chosen
-  model (`beatLitres`); a quest is six steps plus its lines ($0.27) and its new
-  people and places on fal.ai ($0.05) (`questLitres`); a world is one more request, its village's
-  pieces ($0.2), its score ($0.099, one a world since 27 Nov 2026; it was $0.132 in every quest) and its
-  first quest (`worldLitres`) — about 75 L and 53 L on 3.8 Flash. Only what is
-  on for the reader counts (`PriceParts`): the demo has no score and no models, ~37 L a world.
+  model (`beatLitres`); a quest is six steps plus its lines (`QUEST_VOICE_CREDITS`, 5,000 credits: four
+  whole quests on the ledger, 11–25 Nov 2026, took 4,170–5,940) and its new people and places on fal.ai
+  ($0.05) (`questLitres`); a world is one more request, its village's pieces ($0.2), its score (90 s,
+  one a world since 27 Nov 2026; it was $0.132 in every quest) and its first quest (`worldLitres`).
+  The ElevenLabs parts are priced at the day's rate (*ElevenLabs' rate moves on 17 Dec 2026*, below):
+  on 3.8 Flash about 150 L a world and 115 L a quest until then, about 100 L and 65 L after. Only what
+  is on for the reader counts (`PriceParts`): the demo has no score and no models.
+- **ElevenLabs' rate moves on 17 Dec 2026** (owner, 27 Nov 2026: "make diesel accurate now and once the
+  new plan is in force"; `VOICE_PRICES` in `cost.ts`, `usdPerVoiceCredit(at)`, `musicUsd`). The account
+  is Creator, $22 a month ($27.06 with VAT), 121k credits plus rollover, nothing paid past the fee. Until
+  17 Dec a credit is $22 / 121,000 (the code had $22 / 300,000 since Oct, ~2.5× low). That day the
+  owner's confirmed *Switch to new pricing* takes effect: the API at the list price, $0.04 per 1k
+  characters on Flash and $0.08 on v4 ($0.08 per 1k credits either way), music $0.15 a minute, the $22
+  covering that much and a prepaid balance (auto top-up $20 under $5) the rest. Every place that prices
+  ElevenLabs — the gateway's reservation and its `character-cost` charge, the demo's clips, the console,
+  the wallets' drift, the request log's basis, the price list, the diesel tags — asks the rate for the
+  moment, so nothing needs a deploy on the day; if the switch moves, change the date in `VOICE_PRICES`.
 - **Nothing is poured for free outside Paddle, not even for an admin** (owner, 20 Nov 2026: "codes at
   Paddle's level; drop the code concept from the site, and the admin's free top-up too — that goes
   through Paddle as well"). The admin's free canisters (`/wallet/refuel`, 9 Nov 2026) and the game's
@@ -2726,8 +2738,9 @@ brackets. Only v3 and v4 act a tag, and they are told in English. `utils/rpg/aud
   Flash. v4 is served through **Text to Dialogue** (`/v1/text-to-dialogue`, one input), not the TTS
   endpoint, with stability 0.5. It costs **a credit a character, twice Flash** (`voiceCreditsPerChar`,
   $0.08 against $0.04 per 1k on the API price list), and the console labels each clip with the model
-  that spoke it and its credits at that rate. A quest has a handful of tagged lines, so the bill
-  barely moves; the price of putting every line on v4 would be double the voice cost and slower clips.
+  that spoke it and its credits at that rate. **It is not a small part of the bill**: on the ledger
+  (11–25 Nov 2026) tagged lines were ~40% of a quest's characters and 50–65% of its voice credits,
+  since the prompt offers one or two tags a line; every line on v4 would be double again and slower.
 - **v4 refusing is not fatal**: any 4xx but a 429 from v4 sends the same line to Flash without its
   tags and keeps tags off for the session (`tagsOff`); the demo does the same per clip, settles at
   Flash's price and says which model spoke in `x-demo-model`.
@@ -2977,9 +2990,9 @@ tokens streaming, show the errors, the cost of the quest, the total time"). So:
 The record behind all three is `utils/rpg/devlog.ts`, cleared when a quest starts; prices are in
 `utils/rpg/cost.ts`, list prices as of Oct 2026 and marked approximate. Thinking tokens are billed
 as output. ElevenLabs is credits (`eleven_flash_v2_5` is 0.5 a character, or the response's own
-`character-cost` header when the browser may read it), priced as a share of the owner's Creator
-plan: $22 for 300k credits a month, per `/v1/user/subscription` (not the 100k it was once assumed
-to be, which tripled every voice figure). A save's voice dollars are recomputed from its credits. A model
+`character-cost` header when the browser may read it), priced at the owner's rate of the day
+(`VOICE_PRICES` in `cost.ts`: Creator's $22 / 121k credits until 17 Dec 2026, ElevenLabs' API pricing
+at $0.08 per 1k credits after). A save's voice dollars are recomputed from its credits. A model
 missing from the table shows `?`, never a guess. A new kind of request the game waits on gets a
 `startRequest` too, so this stays the whole picture.
 

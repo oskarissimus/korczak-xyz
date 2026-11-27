@@ -19,7 +19,7 @@
 
 import type { ModelSpend, WorldBible } from './genesis';
 import type { ModelTry } from './storyteller';
-import { tokenCost, voiceCost, VOICE_CREDITS_PER_CHAR, type Usage } from './cost';
+import { musicUsd, tokenCost, voiceCost, VOICE_CREDITS_PER_CHAR, type Usage } from './cost';
 import { noteResult, providerOf } from './funds';
 import { reportSpend } from './stats';
 import { rec, recRequest, recResponse } from './replayRecorder';
@@ -169,7 +169,7 @@ export function validSpend(raw: unknown): Spend | null {
     voiceCost: voiceCost(n(s.voiceCredits)),
     musicSeconds: n(s.musicSeconds),
     musicCredits: n(s.musicCredits),
-    musicCost: voiceCost(n(s.musicCredits)),
+    musicCost: musicUsd(n(s.musicSeconds), n(s.musicCredits)),
     falCost: n(s.falCost),
     falModels: n(s.falModels),
     falTextures: n(s.falTextures),
@@ -309,7 +309,9 @@ export function updateRequest(entry: DevRequest, patch: Partial<DevRequest>): vo
     if (entry.status === 'waiting') entry.status = 'streaming';
   }
   if (entry.kind === 'model' && entry.usage) entry.cost = tokenCost(entry.servedBy ?? entry.model, entry.usage);
-  if (entry.kind === 'voice' || entry.kind === 'music') entry.cost = voiceCost(entry.credits);
+  if (entry.kind === 'voice') entry.cost = voiceCost(entry.credits, entry.startedAt);
+  // A music row's `chars` are its seconds.
+  if (entry.kind === 'music') entry.cost = musicUsd(entry.chars, entry.credits, entry.startedAt);
   if (typeof entry.serverCost === 'number') entry.cost = entry.serverCost;
   requests = [...requests];
   changed();

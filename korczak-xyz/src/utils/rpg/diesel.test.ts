@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { beatLitres, questLitres, CANISTERS, EMPTY_LITRES, formatLitres, lineLitres, litres, plantState, worldLitres } from './diesel';
 import { DEMO_MODELS, RPG_DEMO_DEFAULTS } from './demoLimits';
 
@@ -34,9 +34,19 @@ describe('diesel', () => {
 
   it('prices a world and its first quest at what the ledger measured, not just the model’s words', () => {
     const all = { voice: true, music: true, fal: true };
-    // Seven worlds played through their first quest, 1–4 Nov 2026: $0.41–0.72.
-    expect(worldLitres('gemini-3.8-flash', all)).toBeGreaterThan(55);
-    expect(worldLitres('gemini-3.8-flash', all)).toBeLessThan(85);
+    vi.useFakeTimers();
+    try {
+      // ElevenLabs on the legacy Creator credits ($22 / 121k) until 17 Dec 2026: ~5,000 credits of lines a quest.
+      vi.setSystemTime(new Date('2026-12-01T12:00:00Z'));
+      expect(worldLitres('gemini-3.8-flash', all)).toBeGreaterThan(130);
+      expect(worldLitres('gemini-3.8-flash', all)).toBeLessThan(170);
+      // On the API pricing from that day: $0.04 / $0.08 per 1k characters, music $0.15 a minute.
+      vi.setSystemTime(new Date('2026-12-17T12:00:00Z'));
+      expect(worldLitres('gemini-3.8-flash', all)).toBeGreaterThan(85);
+      expect(worldLitres('gemini-3.8-flash', all)).toBeLessThan(115);
+    } finally {
+      vi.useRealTimers();
+    }
     // On the demo: no score, no models, so it is mostly the lines.
     expect(questLitres('gemini-3.8-flash', { voice: true, music: false, fal: false })).toBeLessThan(questLitres('gemini-3.8-flash', all)!);
   });

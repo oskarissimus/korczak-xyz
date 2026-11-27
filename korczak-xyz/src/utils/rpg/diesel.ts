@@ -16,7 +16,7 @@
  * price. `pln` is only what the button says — the price charged is the Paddle price's own.
  */
 
-import { tokenCost } from './cost';
+import { musicUsd, tokenCost, voiceCost } from './cost';
 import { clipCost, priceAs } from './demoLimits';
 import { localeOf } from './language';
 
@@ -53,14 +53,19 @@ export const TYPICAL_LINE = 150;
  */
 /** A quest is about six steps. */
 const QUEST_BEATS = 6;
-/** The lines spoken in a quest, in dollars: ~$0.27 measured (v4 lines cost more than Flash's). */
-const QUEST_VOICE_USD = 0.27;
 /**
- * The world's score (`music.ts`): one 90-second track a world since 27 Nov 2026 (~1,350 credits on the
- * Creator rate), and nothing at all when the library has one good enough — priced as composed, the
+ * The lines spoken in a quest, in ElevenLabs credits, priced at the day's rate (`voiceCost`, `VOICE_PRICES`):
+ * four whole quests on the owner's ledger, 11–25 Nov 2026, took 4,170–5,940 (6–8k characters, ~40% of
+ * them tagged lines on v4 at a credit each, the rest Flash at half). ~$0.91 on the legacy Creator
+ * credits, ~$0.40 on the API pricing from 17 Dec 2026.
+ */
+const QUEST_VOICE_CREDITS = 5_000;
+/**
+ * The world's score (`music.ts`): one 90-second track a world since 27 Nov 2026 (~1,350 credits, ~$0.25 on the legacy
+ * credits, $0.225 on the API pricing), and nothing at all when the library has one good enough — priced as composed, the
  * worst case. Until then a two-minute track was priced into every quest ($0.132).
  */
-const WORLD_MUSIC_USD = 0.099;
+const WORLD_MUSIC_SECONDS = 90;
 /** The people and places a quest adds, made on fal.ai: ~$0.05 a quest beyond the village. */
 const QUEST_FAL_USD = 0.05;
 /** A world's own pieces on fal.ai — the hub's models, the ground, the cover, the hero: ~$0.2. */
@@ -85,7 +90,7 @@ export function questLitres(model: string, parts: PriceParts): number | null {
   if (beat === null) return null;
   return (
     beat * QUEST_BEATS +
-    litres((parts.voice ? QUEST_VOICE_USD : 0) + (parts.fal ? QUEST_FAL_USD : 0))
+    litres((parts.voice ? voiceCost(QUEST_VOICE_CREDITS) : 0) + (parts.fal ? QUEST_FAL_USD : 0))
   );
 }
 
@@ -94,7 +99,7 @@ export function worldLitres(model: string, parts: PriceParts): number | null {
   const beat = beatLitres(model);
   const quest = questLitres(model, parts);
   if (beat === null || quest === null) return null;
-  return beat + litres((parts.fal ? WORLD_FAL_USD : 0) + (parts.music ? WORLD_MUSIC_USD : 0)) + quest;
+  return beat + litres((parts.fal ? WORLD_FAL_USD : 0) + (parts.music ? musicUsd(WORLD_MUSIC_SECONDS) : 0)) + quest;
 }
 
 export function lineLitres(): number {

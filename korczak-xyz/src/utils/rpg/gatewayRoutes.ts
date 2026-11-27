@@ -20,9 +20,9 @@
  */
 
 import {
-  MUSIC_CREDITS_PER_MINUTE,
+  musicUsd,
   tokenCost,
-  USD_PER_VOICE_CREDIT,
+  usdPerVoiceCredit,
   voiceCreditsPerChar,
   type Usage,
 } from './cost';
@@ -272,15 +272,15 @@ export function costUpfront(target: GatewayTarget, body: Record<string, unknown>
     const model = typeof body.model_id === 'string' ? body.model_id : 'eleven_flash_v2_5';
     if (path.startsWith('/v1/text-to-speech/')) {
       const chars = typeof body.text === 'string' ? body.text.length : 0;
-      return chars * voiceCreditsPerChar(model) * USD_PER_VOICE_CREDIT;
+      return chars * voiceCreditsPerChar(model) * usdPerVoiceCredit();
     }
     if (path === '/v1/text-to-dialogue') {
       const inputs = Array.isArray(body.inputs) ? body.inputs : [];
       const chars = inputs.reduce((n: number, i) => n + (typeof i?.text === 'string' ? i.text.length : 0), 0);
-      return chars * voiceCreditsPerChar(model) * USD_PER_VOICE_CREDIT;
+      return chars * voiceCreditsPerChar(model) * usdPerVoiceCredit();
     }
     if (path.startsWith('/v1/music')) {
-      return (num(body.music_length_ms) / 60_000) * MUSIC_CREDITS_PER_MINUTE * USD_PER_VOICE_CREDIT;
+      return musicUsd(num(body.music_length_ms) / 1000);
     }
     return null;
   }
@@ -294,7 +294,7 @@ export function costUpfront(target: GatewayTarget, body: Record<string, unknown>
 /** ElevenLabs' own count of what a clip took, where it says (`character-cost`), in dollars. */
 export function voiceCostFromHeader(header: string | null): number | null {
   const credits = header === null ? NaN : Number(header);
-  return Number.isFinite(credits) ? credits * USD_PER_VOICE_CREDIT : null;
+  return Number.isFinite(credits) ? credits * usdPerVoiceCredit() : null;
 }
 
 /**

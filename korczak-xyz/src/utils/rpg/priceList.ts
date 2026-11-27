@@ -19,7 +19,7 @@
  * charged at the net list price, as it always was.
  */
 
-import { PER_MILLION, PRICE_CHANGES, tokenCost, USD_PER_VOICE_CREDIT, MUSIC_CREDITS_PER_MINUTE } from './cost';
+import { PER_MILLION, PRICE_CHANGES, tokenCost, MUSIC_CREDITS_PER_MINUTE, musicUsd, voicePrice, voiceRateText, VOICE_PRICES } from './cost';
 import { clipCost } from './demoLimits';
 import { LITRES_PER_USD, TYPICAL_BEAT, TYPICAL_LINE } from './diesel';
 import { falCost, geminiImageCost, GEMINI_IMAGE_RATES } from './gatewayRoutes';
@@ -156,14 +156,18 @@ function imageRows(): PriceRow[] {
 }
 
 function elevenRows(): PriceRow[] {
-  const perCredit = `$${(USD_PER_VOICE_CREDIT * 1000).toFixed(4)} per 1k credits (Creator, $22 / 300k credits)`;
-  const planLine = 'Creator $22 (121,000 credits, $11 for the first month)';
-  const planNote = L(
-    `The code prices a credit at $22 / 300,000 (the Creator plan as it was in Oct 2026). Today's page says ${planLine} — ` +
-      'if the account is on today’s Creator, every ElevenLabs price here is ~2.5× too low.',
-    `Kod liczy kredyt jako $22 / 300 000 (plan Creator z października 2026). Dziś strona mówi ${planLine} — ` +
-      'jeśli konto jest na dzisiejszym Creatorze, każda cena ElevenLabs tutaj jest ok. 2,5× za niska.',
-  );
+  const perCredit = voiceRateText();
+  const planLine = 'Creator $22 (121,000 credits; from 17 Dec 2026 the API pricing: $0.04 / $0.08 per 1k characters)';
+  const switchDay = Date.parse(`${VOICE_PRICES[VOICE_PRICES.length - 1].from}T00:00:00Z`);
+  const planNote =
+    Date.now() < switchDay
+      ? L(
+          'Until 17 Dec 2026 a credit is $22 / 121,000, the Creator fee spread over its month; from that day the account is on ' +
+            'ElevenLabs’ prepaid API pricing and a credit is $0.08 / 1,000 (`VOICE_PRICES` in cost.ts).',
+          'Do 17 gru 2026 kredyt to $22 / 121 000, opłata Creatora rozłożona na miesiąc; od tego dnia konto jest na ' +
+            'przedpłaconym cenniku API ElevenLabs i kredyt to $0,08 / 1000 (`VOICE_PRICES` w cost.ts).',
+        )
+      : undefined;
   const musicMinutes = SCORE_MS / 60_000;
   return [
     {
@@ -202,13 +206,13 @@ function elevenRows(): PriceRow[] {
         'Prices exclude all taxes, levies and duties.',
       ],
       source: ELEVEN_API_SRC,
-      method: `music_length_ms / 60,000 × ${MUSIC_CREDITS_PER_MINUTE} credits × ${perCredit}`,
+      method:
+        voicePrice().musicUsdPerMinute !== null
+          ? `music_length_ms / 60,000 × $${voicePrice().musicUsdPerMinute} per minute`
+          : `music_length_ms / 60,000 × ${MUSIC_CREDITS_PER_MINUTE} credits × ${perCredit}`,
       typical: L(`one ${musicMinutes}-minute score`, `jeden utwór, ${musicMinutes} min`),
-      usd: musicMinutes * MUSIC_CREDITS_PER_MINUTE * USD_PER_VOICE_CREDIT,
-      note: L(
-        `Pay-as-you-go would be $${(0.15 * musicMinutes).toFixed(2)} for this; on the plan it is credits. ${planNote.en}`,
-        `Pay-as-you-go to byłoby $${(0.15 * musicMinutes).toFixed(2)}; w abonamencie płacimy kredytami. ${planNote.pl}`,
-      ),
+      usd: musicUsd(musicMinutes * 60),
+      note: planNote,
     },
     {
       provider: 'elevenlabs',

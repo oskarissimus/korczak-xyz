@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { USD_PER_VOICE_CREDIT } from './cost';
+import { usdPerVoiceCredit } from './cost';
 import {
   comparableFrom,
   DAY_MS,
@@ -104,7 +104,7 @@ describe('the drift', () => {
     });
     const el = rows.find((r) => r.provider === 'elevenlabs')!;
     expect(el.actualCredits).toBe(3000);
-    expect(el.actualUsd).toBeCloseTo(3000 * USD_PER_VOICE_CREDIT, 10);
+    expect(el.actualUsd).toBeCloseTo(3000 * usdPerVoiceCredit(), 10);
     expect(el.beforeLogging).toBe(true);
     const g = rows.find((r) => r.provider === 'google')!;
     expect(g.driftUsd).toBeCloseTo(0.5, 10);
@@ -189,10 +189,10 @@ describe('walletStanding: how much is left, at a glance', () => {
   });
 
   it('counts ElevenLabs in credits and dollars both', () => {
-    const st = walletStanding({ readings: [reading({ provider: 'elevenlabs', unit: 'credits', amount: 30_000 })], logged: [], loggingSince: 0 }, 'elevenlabs', now);
+    const st = walletStanding({ readings: [reading({ provider: 'elevenlabs', unit: 'credits', amount: 20_000 })], logged: [], loggingSince: 0 }, 'elevenlabs', now);
     expect(st.basis).toBe('read');
-    expect(st.credits).toBe(30_000);
-    expect(st.usd).toBeCloseTo(2.2);
+    expect(st.credits).toBe(20_000);
+    expect(st.usd).toBeCloseTo(20_000 * usdPerVoiceCredit());
     expect(st.level).toBe('low');
   });
 

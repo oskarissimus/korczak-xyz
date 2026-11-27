@@ -25,7 +25,7 @@
  * Free requests (a status poll, a model list, a library search) are not logged.
  */
 
-import { MUSIC_CREDITS_PER_MINUTE, tokenPrice, USD_PER_VOICE_CREDIT, voiceCreditsPerChar } from './cost';
+import { MUSIC_CREDITS_PER_MINUTE, tokenPrice, voicePrice, voiceRateText, voiceCreditsPerChar } from './cost';
 import type { GatewayProvider, GatewayTarget } from './gatewayRoutes';
 import { GEMINI_IMAGE_RATES, isFalFollowUp } from './gatewayRoutes';
 
@@ -259,14 +259,17 @@ export function describePrice(
   body: Record<string, unknown>,
   f: PriceFacts,
 ): { source: PriceSource; basis: string; usage?: LoggedUsage } {
-  const perK = `$${fmt(USD_PER_VOICE_CREDIT * 1000)}/1k credits`;
+  const perK = voiceRateText();
   if (target.provider === 'elevenlabs') {
     const model = typeof body.model_id === 'string' ? body.model_id : 'eleven_flash_v2_5';
     if (target.path.startsWith('/v1/music')) {
       const seconds = (typeof body.music_length_ms === 'number' ? body.music_length_ms : 0) / 1000;
       return {
         source: f.usd === null ? 'none' : 'list',
-        basis: `${seconds} s × ${MUSIC_CREDITS_PER_MINUTE} credits/min × ${perK}`,
+        basis:
+          voicePrice().musicUsdPerMinute !== null
+            ? `${seconds} s × $${voicePrice().musicUsdPerMinute}/min (${voicePrice().plan})`
+            : `${seconds} s × ${MUSIC_CREDITS_PER_MINUTE} credits/min × ${perK}`,
         usage: { seconds },
       };
     }

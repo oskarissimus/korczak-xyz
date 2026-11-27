@@ -66,6 +66,7 @@ vi.mock('firebase-admin/auth', () => ({
 }));
 
 import { handleRpgDemo } from './handler';
+import { usdPerVoiceCredit } from '../../../korczak-xyz/src/utils/rpg/cost';
 
 const ctx = {
   lang: 'en',
@@ -261,7 +262,7 @@ describe('rpgDemo', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('audio/mpeg');
     expect(fetch.mock.calls[0][1].headers['xi-api-key']).toBe('sk_owner-0000000000');
-    expect(spent().all).toBeCloseTo(7 * 0.5 * (22 / 300_000), 9);
+    expect(spent().all).toBeCloseTo(7 * 0.5 * usdPerVoiceCredit(), 9);
     expect(fetch.mock.calls[0][0]).toContain('/v1/text-to-speech/');
     expect(JSON.parse(fetch.mock.calls[0][1].body).model_id).toBe('eleven_flash_v2_5');
 
@@ -280,7 +281,7 @@ describe('rpgDemo', () => {
     expect(fetch.mock.calls[0][0]).toContain('/v1/text-to-dialogue');
     const sent = JSON.parse(fetch.mock.calls[0][1].body);
     expect(sent).toMatchObject({ model_id: 'eleven_v4', inputs: [{ text: 'Pył. [coughs].' }] });
-    expect(spent().all).toBeCloseTo('Pył. [coughs].'.length * 1 * (22 / 300_000), 9);
+    expect(spent().all).toBeCloseTo('Pył. [coughs].'.length * 1 * usdPerVoiceCredit(), 9);
 
     fetch.mockReset();
     fetch

@@ -80,32 +80,75 @@ export function tokenCost(model: string, usage: Usage, at: number = Date.now()):
 /**
  * ElevenLabs bills credits, not dollars: `eleven_flash_v2_5` costs half a credit per character
  * (checked against the account's own history in Oct 2026: 200 characters moved the count by 100).
- * The dollar figure is the owner's plan as `/v1/user/subscription` reports it — Creator, $22 a month
- * before VAT for 300k credits, so about $0.07 per 1k. It is a subscription, so within the month's
- * credits a clip costs nothing more; this is the share of the fee it used up. Another plan has
- * another rate, so the credits are the number to trust.
+ * Every other speech model is a credit a character: v4 and v3, the ones that act audio tags. A
+ * tagged line costs twice what it would on Flash (`voice.ts`, `TAG_MODEL`).
  */
 export const VOICE_CREDITS_PER_CHAR = 0.5;
 
-/**
- * Every other speech model is a credit a character: v4 and v3, the ones that act audio tags
- * (ElevenLabs' API pricing, Oct 2026: $0.08 per 1k characters against Flash's $0.04). A tagged line
- * costs twice what it would on Flash (`voice.ts`, `TAG_MODEL`).
- */
 export function voiceCreditsPerChar(model: string): number {
   return model.startsWith('eleven_flash') || model.startsWith('eleven_turbo') ? VOICE_CREDITS_PER_CHAR : 1;
 }
-export const USD_PER_VOICE_CREDIT = 22 / 300_000;
 
 /**
- * Music is billed per generation by its length, ~900 credits a minute on a plan (ElevenLabs' pricing
- * page, Oct 2026; $0.15 a minute on the API price list), from the same credits as the voices
- * (`music.ts`).
+ * What a credit costs the owner, net of VAT, from the day each rate applies (owner, 27 Nov 2026:
+ * "make diesel accurate now and once the new plan is in force"). Read off the account that day:
+ * Creator, $22 a month ($27.06 with VAT), 121,000 credits a month plus what rolled over, nothing
+ * paid beyond the fee so far. Until then the code priced a credit at $22 / 300,000, the Creator of
+ * Oct 2026; by November the same $22 bought 121k, so every ElevenLabs price was ~2.5× low.
+ *
+ * - **Until 17 Dec 2026, legacy credits**: $22 / 121,000 a credit, the fee spread over the month's
+ *   own credits. Within them a clip costs nothing more; this is its share of the fee.
+ * - **From 17 Dec 2026, the prepaid API pricing** (the owner confirmed *Switch to new pricing* on
+ *   27 Nov; it takes effect at the end of the billing cycle, and there is no way back): the API is
+ *   billed at the list price, $0.04 per 1k characters on Flash/Turbo and $0.08 on v4/v3
+ *   (elevenlabs.io/pricing/api). The plan's $22 covers that much (550k Flash characters) and past it
+ *   a prepaid balance pays the same rates, topped up $20 at a time. Both are $0.08 per 1k credits at
+ *   0.5 and 1 credit a character, so a credit stays the unit. Music is $0.15 a minute on that list,
+ *   not credits (`musicUsd`).
+ *
+ * If the switch moves, change the date here; nothing else names it.
+ */
+export const VOICE_PRICES: { from: string; usdPerCredit: number; musicUsdPerMinute: number | null; plan: string }[] = [
+  { from: '2026-01-01', usdPerCredit: 22 / 121_000, musicUsdPerMinute: null, plan: 'Creator, $22 / 121k credits' },
+  { from: '2026-12-17', usdPerCredit: 0.08 / 1000, musicUsdPerMinute: 0.15, plan: 'API pricing, $0.04 / $0.08 per 1k chars' },
+];
+
+/** The voice rate in force at `at` (ms, default now). */
+export function voicePrice(at: number = Date.now()): (typeof VOICE_PRICES)[number] {
+  let row = VOICE_PRICES[0];
+  for (const r of VOICE_PRICES) if (Date.parse(`${r.from}T00:00:00Z`) <= at) row = r;
+  return row;
+}
+
+export function usdPerVoiceCredit(at: number = Date.now()): number {
+  return voicePrice(at).usdPerCredit;
+}
+
+/**
+ * Music is billed per generation by its length: ~900 credits a minute on the legacy credits
+ * (ElevenLabs' pricing page, Oct 2026), from the same credits as the voices (`music.ts`); $0.15 a
+ * minute on the API pricing.
  */
 export const MUSIC_CREDITS_PER_MINUTE = 900;
 
-export function voiceCost(credits: number): number {
-  return credits * USD_PER_VOICE_CREDIT;
+export function voiceCost(credits: number, at: number = Date.now()): number {
+  return credits * usdPerVoiceCredit(at);
+}
+
+/**
+ * A score's price: per minute on the API pricing; before it, the credits ElevenLabs charged
+ * (`credits`, else 900 a minute) at the credit rate.
+ */
+export function musicUsd(seconds: number, credits: number | null = null, at: number = Date.now()): number {
+  const row = voicePrice(at);
+  if (row.musicUsdPerMinute !== null) return (seconds / 60) * row.musicUsdPerMinute;
+  return (credits ?? (seconds / 60) * MUSIC_CREDITS_PER_MINUTE) * row.usdPerCredit;
+}
+
+/** The rate as text for a basis line, e.g. "$0.1818/1k credits (Creator, $22 / 121k credits)". */
+export function voiceRateText(at: number = Date.now()): string {
+  const row = voicePrice(at);
+  return `$${Math.round(row.usdPerCredit * 1e7) / 1e4}/1k credits (${row.plan})`;
 }
 
 export function formatUsd(usd: number | null): string {

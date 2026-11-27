@@ -16,7 +16,7 @@
  * app, a console session — is in the provider's figure and not in the estimate, and is drift too.
  */
 
-import { USD_PER_VOICE_CREDIT } from './cost';
+import { usdPerVoiceCredit } from './cost';
 import type { WalletAlarm } from './fundsSigns';
 import type { LogPayer, RequestLogEntry } from './requestLog';
 
@@ -136,7 +136,7 @@ export function parseWalletPatch(raw: unknown, now = Date.now()): WalletPatch {
 
 /** A reading's figure in dollars: ElevenLabs' credits at the price the diesel charges them at. */
 export function usdOfAmount(amount: number, unit: WalletUnit): number {
-  return unit === 'credits' ? amount * USD_PER_VOICE_CREDIT : amount;
+  return unit === 'credits' ? amount * usdPerVoiceCredit() : amount;
 }
 
 /** The log's priced spend of one provider in (from, to], and how many requests had no price. */
@@ -314,7 +314,7 @@ export function walletStanding(
       ...base,
       basis: since.calls > 0 ? 'estimate' : 'read',
       usd,
-      credits: balance.unit === 'credits' ? balance.amount - since.usd / USD_PER_VOICE_CREDIT : null,
+      credits: balance.unit === 'credits' ? balance.amount - since.usd / usdPerVoiceCredit() : null,
       at: balance.at,
       source: balance.source,
       loggedUsd: since.usd,
