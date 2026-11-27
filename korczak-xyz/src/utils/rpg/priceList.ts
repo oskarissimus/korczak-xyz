@@ -25,7 +25,7 @@ import { LITRES_PER_USD, TYPICAL_BEAT, TYPICAL_LINE } from './diesel';
 import { falCost, geminiImageCost, GEMINI_IMAGE_RATES } from './gatewayRoutes';
 
 /** The score's length (`MUSIC_MS` in `music.ts`, which this pure file cannot import; a test holds them equal). */
-export const SCORE_MS = 120_000;
+export const SCORE_MS = 90_000;
 
 /** The day the verbatim texts were read off the providers' pages. */
 export const CHECKED = '2026-11-10';

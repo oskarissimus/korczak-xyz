@@ -1,15 +1,16 @@
 /*
- * The score under the game: a track composed by ElevenLabs' Music API for the world and the quest's
- * tone (owner, 30 Oct 2026: "a generated soundtrack in ElevenLabs — music only for now, fitted to
+ * The score under the game: a track composed by ElevenLabs' Music API for the world
+ * (owner, 30 Oct 2026: "a generated soundtrack in ElevenLabs — music only for now, fitted to
  * the world's climate and the RPG"). No sound effects.
  *
  * - **What it is asked for**: the world's own `music` line (English, written by the genesis beside
  *   the landmark and the terrain) or, for a world from before it, one put together from the look and
- *   the bible; then the quest's tone (`TONE_MUSIC`), then the same rules for every track —
+ *   the bible; then the same rules for every track (`MUSIC_RULES`) —
  *   instrumental, under dialogue, no drops, ending as it began so it loops.
- * - **Once per world and tone**: up to four tracks a world, kept in the Cache API (`rpg-music`), so
- *   a new quest of a tone this world has had plays at once and costs nothing. This browser only;
- *   another device composes its own.
+ * - **Once per world** (owner, 27 Nov 2026: "compose music once per world, a bit shorter"): one
+ *   track a world, kept in the Cache API (`rpg-music`), and before anything is composed the account
+ *   asks the shared library (`musicLibrary.ts`) for one good enough — a hit costs nothing. A score
+ *   the server's keys compose joins the library on the gateway.
  * - **Priced from the length**: ElevenLabs bills music per generation, ~900 credits a minute
  *   (pricing page, Oct 2026: "Eleven Music 900 credits per minute", $0.15 a minute on the API price
  *   list), or the response's own `character-cost` where the browser may read it.
@@ -20,9 +21,9 @@
  */
 
 import type { WorldBible } from './genesis';
-import type { Tone } from './quest';
 import { endRequest, startRequest, updateRequest } from './devlog';
-import { apiFetch, serverCost } from './gateway';
+import { apiFetch, findMusicTrack, serverCost } from './gateway';
+import { MUSIC_RULES } from './musicLibrary';
 import { outOfFunds } from './funds';
 import { MUSIC_CREDITS_PER_MINUTE } from './cost';
 import { rememberTiming } from './progress';
@@ -31,22 +32,8 @@ import { rememberTiming } from './progress';
 export const MUSIC_MODEL = 'music_v2_5';
 export const MUSIC_FALLBACK = 'music_v1';
 
-/** Two minutes: long enough that the loop is not noticed on a walk, ~1,800 credits a track. */
-export const MUSIC_MS = 120_000;
-
-/** What each tone sounds like, said to the model after the world. */
-export const TONE_MUSIC: Record<Tone, string> = {
-  light: 'warm, gentle and unhurried, the calm of an ordinary good day',
-  comic: 'playful and light-footed, a little mischievous, with a wink',
-  adventure: 'adventurous, wonder and quiet momentum, curiosity about what lies ahead',
-  grim: 'melancholic and tense, sparse, low drones and a sense of foreboding',
-};
-
-/** The rules every track gets: it is a background score, and it must loop. */
-const RULES =
-  'Instrumental only, no vocals, no choir singing words. Background score for exploring an open-world RPG: ' +
-  'steady and unobtrusive, sitting under spoken dialogue, no big drops, no sudden stops, no fade-out. ' +
-  'A seamless loop that ends the way it begins.';
+/** A minute and a half (two minutes until 27 Nov 2026): crossfaded at each pass, ~1,350 credits a track. */
+export const MUSIC_MS = 90_000;
 
 const TIME: Record<WorldBible['look']['time'], string> = {
   dawn: 'at dawn',
@@ -88,9 +75,9 @@ export function worldMusic(world: WorldBible): string {
   return `Score for a world that feels ${mood}.${setting ? ` Its tone, technology and climate: "${setting}".` : ''}`;
 }
 
-/** The whole prompt: the world, the quest's tone, the rules. */
-export function musicPrompt(world: WorldBible, tone: Tone | null): string {
-  return [worldMusic(world), tone ? `Mood: ${TONE_MUSIC[tone]}.` : null, RULES].filter(Boolean).join(' ');
+/** The whole prompt: the world, then the rules. One score a world, whatever the quest's tone. */
+export function musicPrompt(world: WorldBible): string {
+  return `${worldMusic(world)} ${MUSIC_RULES}`;
 }
 
 /** A track's credits: ElevenLabs' own count where its response says, else the list rate for its length. */
@@ -140,7 +127,7 @@ let model = MUSIC_MODEL;
 export type MusicStatus = 'idle' | 'composing' | 'ready' | 'failed';
 export interface MusicState {
   status: MusicStatus;
-  /** The world and tone (`musicId`) it is about. */
+  /** The world (`musicId`) it is about. */
   id: string | null;
   /** When composing began. */
   since: number | null;
@@ -175,9 +162,9 @@ export function forgetMusicState(): void {
 const CACHE = 'rpg-music';
 const tracks = new Map<string, Promise<ArrayBuffer>>();
 
-function cacheUrl(worldId: string, tone: Tone | null): string {
+function cacheUrl(worldId: string): string {
   const origin = typeof location === 'undefined' ? 'https://korczak.xyz' : location.origin;
-  return `${origin}/__rpg-music/${encodeURIComponent(worldId)}/${tone ?? 'any'}/${MUSIC_MS}`;
+  return `${origin}/__rpg-music/${encodeURIComponent(worldId)}/world`;
 }
 
 async function cached(url: string): Promise<ArrayBuffer | null> {
@@ -270,12 +257,40 @@ async function compose(key: string, prompt: string, label: string, onSeconds: (s
 }
 
 /**
- * The world's track for this tone: from this browser's cache, else composed once and kept. Its
+ * The library's track for this world, or null to compose (signed out, a miss, a file that would not
+ * come). Into the console as a music row at no cost, with the score, so the threshold can be judged.
+ */
+async function fromLibrary(prompt: string, worldId: string): Promise<ArrayBuffer | null> {
+  const answer = await findMusicTrack(prompt, worldId);
+  if (!answer) return null;
+  const said = answer.best === null ? `library: ${answer.size} tracks, nothing to compare` : `library: closest ${answer.best.toFixed(3)} of ${answer.size}, threshold ${answer.threshold}`;
+  if (!answer.hit) {
+    const miss = startRequest('music', 'library', null, prompt, 'library');
+    endRequest(miss, null, { text: `${prompt}\n\n♪ ${said} — composing`, chars: 0, credits: 0, serverCost: 0 });
+    return null;
+  }
+  const hit = answer.hit;
+  const entry = startRequest('music', 'library', null, prompt, 'library');
+  try {
+    const response = await fetch(hit.url);
+    if (!response.ok) throw new Error(`library track ${response.status}`);
+    const bytes = await response.arrayBuffer();
+    const how = hit.assigned ? 'this world’s track' : `match ${hit.score.toFixed(3)} ≥ ${answer.threshold}`;
+    endRequest(entry, null, { text: `${prompt}\n\n♪ ${how}: “${hit.prompt}”`, chars: 0, credits: 0, serverCost: 0 });
+    return bytes;
+  } catch (e) {
+    endRequest(entry, e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+/**
+ * The world's track: from this browser's cache, else the library's, else composed once and kept. Its
  * progress is `musicState`; a failure is not kept, so asking again (the retry) composes again.
  */
-export function musicFor(key: string, world: WorldBible, tone: Tone | null): Promise<ArrayBuffer> {
-  const url = cacheUrl(world.id, tone);
-  const id = musicId(world.id, tone);
+export function musicFor(key: string, world: WorldBible): Promise<ArrayBuffer> {
+  const url = cacheUrl(world.id);
+  const id = musicId(world.id);
   let track = tracks.get(url);
   if (track) return track;
   track = (async () => {
@@ -290,9 +305,16 @@ export function musicFor(key: string, world: WorldBible, tone: Tone | null): Pro
       setState({ status: 'failed', id, since: null, seconds: 0, error });
       throw new Error(error);
     }
+    const prompt = musicPrompt(world);
     setState({ status: 'composing', id, since: Date.now(), seconds: 0, error: null });
+    const found = await fromLibrary(prompt, world.id);
+    if (found && found.byteLength >= BYTES_PER_SECOND) {
+      await keep(url, found.slice(0));
+      if (state.id === id) setState({ status: 'ready', since: null, seconds: MUSIC_MS / 1000 });
+      return found;
+    }
     try {
-      const bytes = await compose(key, musicPrompt(world, tone), tone ?? 'music', (s) => {
+      const bytes = await compose(key, prompt, 'music', (s) => {
         if (state.id === id) setState({ seconds: Math.min(s, MUSIC_MS / 1000) });
       });
       if (state.since !== null && state.id === id) rememberTiming('music', Date.now() - state.since);
@@ -310,8 +332,8 @@ export function musicFor(key: string, world: WorldBible, tone: Tone | null): Pro
 }
 
 /** A track that came but would not play (it would not decode): failed, with the reason, and not kept. */
-export function musicUnplayable(worldId: string, tone: Tone | null, error: unknown): void {
-  const url = cacheUrl(worldId, tone);
+export function musicUnplayable(worldId: string, error: unknown): void {
+  const url = cacheUrl(worldId);
   tracks.delete(url);
   void (async () => {
     try {
@@ -320,7 +342,7 @@ export function musicUnplayable(worldId: string, tone: Tone | null, error: unkno
       /* composed again anyway: the promise is gone */
     }
   })();
-  if (state.id === musicId(worldId, tone)) setState({ status: 'failed', error: `decode: ${error instanceof Error ? error.message : String(error)}` });
+  if (state.id === musicId(worldId)) setState({ status: 'failed', error: `decode: ${error instanceof Error ? error.message : String(error)}` });
 }
 
 /* ---- Playing it ---- */
@@ -378,7 +400,7 @@ export function stopMusic(): void {
   playing = null;
 }
 
-/** What is playing now: the world and tone's id, or null. */
+/** What is playing now: the world's id, or null. */
 export function playingMusic(): string | null {
   return playing?.id ?? null;
 }
@@ -450,9 +472,9 @@ export async function playMusic(id: string, bytes: ArrayBuffer): Promise<void> {
   };
 }
 
-/** The id `playMusic` and `musicFor` agree on for a world and tone. */
-export function musicId(worldId: string, tone: Tone | null): string {
-  return `${worldId}|${tone ?? 'any'}`;
+/** The id `playMusic` and `musicFor` agree on for a world. */
+export function musicId(worldId: string): string {
+  return `${worldId}|world`;
 }
 
 /** The score's switch, kept per browser (`rpg-music`, `'0'` when off); on unless turned off. */

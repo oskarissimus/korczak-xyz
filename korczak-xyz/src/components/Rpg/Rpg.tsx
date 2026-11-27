@@ -2907,7 +2907,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   }, [dialogue, flash, gameLang, measureVoice, voiceKey, voiceOn]);
   useEffect(() => stopVoice, []);
 
-  // The score: the world and tone's track, composed once and kept (`music.ts`), fading in when it
+  // The score: the world's track, from the library or composed once and kept (`music.ts`), fading in when it
   // is ready; nothing waits for it. Off, back at the intro or without a key of the reader's own: silence.
   useEffect(() => {
     if (!started || !musicOn || !musicKey || !score) {
@@ -2915,15 +2915,15 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       forgetMusicState();
       return;
     }
-    const { world: w, tone } = score;
-    const id = musicId(w.id, tone);
+    const { world: w } = score;
+    const id = musicId(w.id);
     if (playingMusic() === id) return;
     let stale = false;
-    musicFor(musicKey, w, tone)
+    musicFor(musicKey, w)
       .then((bytes) => {
         if (stale) return;
         return playMusic(id, bytes).catch((e) => {
-          musicUnplayable(w.id, tone, e);
+          musicUnplayable(w.id, e);
           throw e;
         });
       })

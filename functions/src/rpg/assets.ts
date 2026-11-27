@@ -46,6 +46,7 @@ import {
 import { COST_HEADER, type GatewayTarget } from '../../../korczak-xyz/src/utils/rpg/gatewayRoutes';
 import { RPG_BUCKET, db } from '../runtime';
 import { takeDaily } from './dailyCap';
+import { addToLibrary } from './musicLibrary';
 import { reportError } from '../sentry';
 
 /** Larger than anything a provider answers the game with; a bound, not a budget. */
@@ -402,7 +403,13 @@ export async function keepJson(ctx: AssetContext, bytes: Buffer, usd: number | n
 export async function keepAudio(ctx: AssetContext, bytes: Buffer, contentType: string, usd: number | null): Promise<string | null> {
   if (ctx.route.shape !== 'audio' || bytes.length === 0) return null;
   try {
-    const kept = await keepAsset(ctx.uid, recordFor(ctx, usd), [{ role: ctx.route.kind, bytes, contentType: contentType.split(';')[0] || 'audio/mpeg' }], undefined, 'audio');
+    const record = recordFor(ctx, usd);
+    const kept = await keepAsset(ctx.uid, record, [{ role: ctx.route.kind, bytes, contentType: contentType.split(';')[0] || 'audio/mpeg' }], undefined, 'audio');
+    // A score the server's keys paid for joins the shared library (`musicLibrary.ts`), before the answer ends.
+    if (ctx.route.kind === 'music' && kept.files[0]) {
+      const ms = typeof ctx.json.music_length_ms === 'number' ? ctx.json.music_length_ms : 0;
+      await addToLibrary(ctx.uid, ctx.payer, { assetId: kept.assetId, url: kept.files[0].url, prompt: record.prompt, ms, model: record.model, world: ctx.world });
+    }
     return kept.files.length ? kept.assetId : null;
   } catch (e) {
     reportError('rpgAssets.keep', e, { route: ctx.target.path });

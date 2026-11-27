@@ -43,6 +43,7 @@ import {
 } from './requestLog';
 import { KEEP_HEADER, keepsAssets } from './assetStore';
 import { WALLET_PATH, type WalletStatus } from './wallet';
+import { MUSIC_FIND_PATH, type MusicFindAnswer } from './musicLibrary';
 
 export { ACCOUNT_KEY };
 
@@ -155,6 +156,21 @@ export async function fetchWallet(signal?: AbortSignal): Promise<WalletStatus | 
     if (!response.ok) return null;
     const body = (await response.json()) as WalletStatus;
     return typeof body?.balanceUsd === 'number' && body.server ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The score library (`musicLibrary.ts`): a track good enough for this world, or a miss and the closest
+ * score. Null signed out or unreachable — the page composes, as it would have.
+ */
+export async function findMusicTrack(prompt: string, world: string, signal?: AbortSignal): Promise<MusicFindAnswer | null> {
+  try {
+    const response = await signedInCall(MUSIC_FIND_PATH, 'POST', signal, { prompt, world });
+    if (!response.ok) return null;
+    const body = (await response.json()) as MusicFindAnswer;
+    return body && typeof body.threshold === 'number' ? body : null;
   } catch {
     return null;
   }

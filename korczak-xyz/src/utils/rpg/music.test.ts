@@ -4,10 +4,10 @@ import { MUSIC_MS, musicCredits, musicError, musicFormat, musicId, musicPrompt, 
 import { NO_SPEND, addSpend, spendUsd, validSpend } from './devlog';
 
 describe('the score', () => {
-  it('asks for the world’s own music line, the tone and the loop rules', () => {
-    const prompt = musicPrompt(classicWorld('pl'), 'comic');
+  it('asks for the world’s own music line and the loop rules, one score a world', () => {
+    const prompt = musicPrompt(classicWorld('pl'));
     expect(prompt).toContain('hurdy-gurdy');
-    expect(prompt).toContain('playful');
+    expect(prompt).not.toMatch(/Mood:/);
     expect(prompt).toMatch(/Instrumental only/);
     expect(prompt).toMatch(/seamless loop/i);
   });
@@ -22,7 +22,7 @@ describe('the score', () => {
   });
 
   it('prices a track by its length, or by what ElevenLabs says it charged', () => {
-    expect(musicCredits(MUSIC_MS, null)).toBe(1800);
+    expect(musicCredits(MUSIC_MS, null)).toBe(1350);
     expect(musicCredits(60_000, '750')).toBe(750);
     expect(musicCredits(60_000, 'nope')).toBe(900);
   });
@@ -46,9 +46,9 @@ describe('the score', () => {
     expect(musicFormat('music_v1')).toBe('mp3_44100_128');
   });
 
-  it('keeps one track per world and tone', () => {
-    expect(musicId('w1', 'grim')).not.toBe(musicId('w1', 'light'));
-    expect(musicId('w1', null)).toBe('w1|any');
+  it('keeps one track per world', () => {
+    expect(musicId('w1')).toBe('w1|world');
+    expect(musicId('w1')).not.toBe(musicId('w2'));
   });
 
   it('reads the genesis’s music line', () => {

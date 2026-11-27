@@ -55,8 +55,12 @@ export const TYPICAL_LINE = 150;
 const QUEST_BEATS = 6;
 /** The lines spoken in a quest, in dollars: ~$0.27 measured (v4 lines cost more than Flash's). */
 const QUEST_VOICE_USD = 0.27;
-/** The score composed for a quest (`music.ts`): a two-minute track, ElevenLabs' list price. */
-const QUEST_MUSIC_USD = 0.132;
+/**
+ * The world's score (`music.ts`): one 90-second track a world since 27 Nov 2026 (~1,350 credits on the
+ * Creator rate), and nothing at all when the library has one good enough — priced as composed, the
+ * worst case. Until then a two-minute track was priced into every quest ($0.132).
+ */
+const WORLD_MUSIC_USD = 0.099;
 /** The people and places a quest adds, made on fal.ai: ~$0.05 a quest beyond the village. */
 const QUEST_FAL_USD = 0.05;
 /** A world's own pieces on fal.ai — the hub's models, the ground, the cover, the hero: ~$0.2. */
@@ -75,22 +79,22 @@ export function beatLitres(model: string): number | null {
   return usd === null ? null : litres(usd);
 }
 
-/** About what a whole quest costs: its steps, its lines, its score and its new people and places. */
+/** About what a whole quest costs: its steps, its lines and its new people and places (the score is the world's). */
 export function questLitres(model: string, parts: PriceParts): number | null {
   const beat = beatLitres(model);
   if (beat === null) return null;
   return (
     beat * QUEST_BEATS +
-    litres((parts.voice ? QUEST_VOICE_USD : 0) + (parts.music ? QUEST_MUSIC_USD : 0) + (parts.fal ? QUEST_FAL_USD : 0))
+    litres((parts.voice ? QUEST_VOICE_USD : 0) + (parts.fal ? QUEST_FAL_USD : 0))
   );
 }
 
-/** A new world: the world itself (one request), its village's pieces, and the first quest played in it. */
+/** A new world: the world itself (one request), its village's pieces, its score, and the first quest played in it. */
 export function worldLitres(model: string, parts: PriceParts): number | null {
   const beat = beatLitres(model);
   const quest = questLitres(model, parts);
   if (beat === null || quest === null) return null;
-  return beat + litres(parts.fal ? WORLD_FAL_USD : 0) + quest;
+  return beat + litres((parts.fal ? WORLD_FAL_USD : 0) + (parts.music ? WORLD_MUSIC_USD : 0)) + quest;
 }
 
 export function lineLitres(): number {

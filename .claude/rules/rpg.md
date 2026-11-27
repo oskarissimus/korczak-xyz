@@ -2245,9 +2245,10 @@ the price of a world or a beat is in it too."
   9 Nov 2026 they priced only the model's words — ~1.9 L for a world, ~0.9 L for a quest — while the
   ledger measured $0.41–0.72 for a world and its first quest, most of it ElevenLabs and fal.ai (owner:
   "massively underpriced"). Now (`diesel.ts`): a step is 8k in, 1.2k out, 0.8k thinking on the chosen
-  model (`beatLitres`); a quest is six steps plus its lines ($0.27), its score ($0.132) and its new
+  model (`beatLitres`); a quest is six steps plus its lines ($0.27) and its new
   people and places on fal.ai ($0.05) (`questLitres`); a world is one more request, its village's
-  pieces ($0.2) and its first quest (`worldLitres`) — about 75 L and 53 L on 3.8 Flash. Only what is
+  pieces ($0.2), its score ($0.099, one a world since 27 Nov 2026; it was $0.132 in every quest) and its
+  first quest (`worldLitres`) — about 75 L and 53 L on 3.8 Flash. Only what is
   on for the reader counts (`PriceParts`): the demo has no score and no models, ~37 L a world.
 - **Nothing is poured for free outside Paddle, not even for an admin** (owner, 20 Nov 2026: "codes at
   Paddle's level; drop the code concept from the site, and the admin's free top-up too — that goes
@@ -2743,24 +2744,49 @@ owner's credits for strangers. No sound effects yet.
 
 - **What is asked for**: the world's `music` line — genesis writes it in English beside the
   landmark and the terrain (≤25 words: genre, instruments, tempo, era, feel; no artist or franchise
-  names, which ElevenLabs refuses) — then the quest's tone (`TONE_MUSIC`: light warm, comic playful,
-  adventure wonder, grim sparse drones), then the same rules for every track: instrumental, under
-  dialogue, no drops, no fade-out, a loop that ends as it began. A world from before the line is
-  described from its look in English (weather, water, flora, time of day) and its tone, tech and
-  climate as written (`worldMusic`). The Willowlands have a line of their own (dark folk, hurdy-gurdy).
-- **`POST /v1/music/stream`**, `music_v2_5`, `force_instrumental`, `music_length_ms` 120 000
-  (`MUSIC_MS`), mp3 at 128 kb/s (48 kHz for v2 models, 44.1 for v1: `musicFormat`), so the bytes
-  say how many seconds have come. Streamed rather than one silent two-minute request (the first
-  build used `/v1/music` at 44.1 kHz and failed on the owner's phone the first day, reason unseen).
-  Any 4xx but 401 and 429 from v2.5 asks `music_v1` instead and stays on it for the session, v2.5's
-  reason kept in the console row. CORS answers `*` (checked 30 Oct 2026). **Not yet run against the
-  live API from here** (the session could not read a key): the shape is ElevenLabs' reference.
-- **Once per world and tone**: up to four tracks a world, the bytes in the Cache API (`rpg-music`,
-  keyed by world, tone and length). A new quest of a tone the world has had plays at once and
-  costs nothing. This browser only; another device composes its own. Nothing waits for a track:
-  the quest starts in silence and the music fades in when it comes.
+  names, which ElevenLabs refuses) — then the same rules for every track (`MUSIC_RULES` in
+  `musicLibrary.ts`): instrumental, under dialogue, no drops, no fade-out, a loop that ends as it
+  began. A world from before the line is described from its look in English (weather, water, flora,
+  time of day) and its tone, tech and climate as written (`worldMusic`). The Willowlands have a line
+  of their own (dark folk, hurdy-gurdy). **No quest tone any more** (owner, 27 Nov 2026: "compose music
+  once per world, a bit shorter"): until then each world had up to four tracks, one per tone
+  (`TONE_MUSIC`, gone).
+- **`POST /v1/music/stream`**, `music_v2_5`, `force_instrumental`, `music_length_ms` 90 000
+  (`MUSIC_MS`; 120 000 until 27 Nov 2026), mp3 at 128 kb/s (48 kHz for v2 models, 44.1 for v1:
+  `musicFormat`), so the bytes say how many seconds have come. Streamed rather than one silent
+  request (the first build used `/v1/music` at 44.1 kHz and failed on the owner's phone the first day,
+  reason unseen). Any 4xx but 401 and 429 from v2.5 asks `music_v1` instead and stays on it for the
+  session, v2.5's reason kept in the console row. CORS answers `*` (checked 30 Oct 2026).
+- **Once per world, in this browser**: the bytes in the Cache API (`rpg-music`, keyed by world). Nothing
+  waits for a track: the quest starts in silence and the music fades in when it comes.
+- **The library before composing** (owner, same day: "search the bucket before composing — a threshold
+  where the music is good enough for the world and we take it from the library, else compose and add it
+  to the library"). `utils/rpg/musicLibrary.ts` is the shared half, `functions/src/rpg/musicLibrary.ts`
+  the gateway's:
+  - **Find**: a signed-in page asks `POST /music/find` with the prompt and the world before composing.
+    The gateway answers the world's own track if it was given one (`rpgMusicWorlds/{uid}_{world}`), else
+    embeds the world line (`musicQueryOf` takes the rules back off; `gemini-embedding-2`,
+    `SEMANTIC_SIMILARITY`, 768 dimensions, on the server's Google key, `musicFind` 200 a day per account)
+    and scans `rpgMusicLibrary` for the closest cosine. At or over the threshold it is a hit: given to the
+    world (so every device gets the same one) and fetched from the bucket at $0. Under it, or signed out,
+    or anything failing, the page composes as before. The console has a `music · library` row either way
+    with the closest score, the threshold and the track's own line, which is what to tune by.
+  - **The threshold** is `rpgMusic/config.threshold`, default **0.88** (`MUSIC_MATCH_DEFAULT`), read
+    every five minutes. Measured on twelve made-up world lines (27 Nov 2026): the same world said twice
+    0.94–0.95, the same genre in another place (dark slavic folk in misty marshes / dark medieval folk in
+    a cold northern forest) 0.89, a neighbouring genre (that / cosy Celtic folk) 0.85, the rest
+    0.68–0.80. `gemini-embedding-001` spread the same pairs over 0.76–0.95, so it separated less.
+  - **Add**: `keepAudio` in `assets.ts` puts a kept score in the library, embedded, before the answer
+    ends, when the **server's keys** paid (`diesel`) or an **admin's own key** did. A reader's own
+    ElevenLabs key composed for them: kept on their account, never handed to strangers. Each track has
+    `uses`, `sourceUid`, `world` and its line; the bytes stay where the asset store put them
+    (`users/{uid}/rpg/{assetId}/music.mp3`, a download-token URL). A linear scan, not a vector index:
+    a few hundred tracks at most for a long while.
+  - The library is per project, like everything else: everyrpg's (`korczak-rpg`) and korczak.xyz's
+    are separate.
 - **What it costs**: ~900 credits a minute (ElevenLabs' pricing page, Oct 2026; $0.15 a minute on
-  the API list), so **~1,800 credits a track, ≈ $0.13 on the owner's Creator rate**, or the
+  the API list), so **~1,350 credits a track, ≈ $0.10 on the owner's Creator rate**, once per world and
+  nothing for a library hit (`diesel.ts` prices it into the world, not each quest), or the
   response's `character-cost` where the browser may read it (`musicCredits`).
 - **Played through Web Audio, not `<audio>`**: iOS ignores `volume` on a media element, so the
   score could not sit under the voices. One `AudioContext`, resumed inside every click that primes

@@ -69,6 +69,8 @@ import {
 } from '../../../korczak-xyz/src/utils/rpg/gatewayRoutes';
 import { ASSET_HEADER, FRESH_HEADER, KEEP_HEADER, REUSED_HEADER } from '../../../korczak-xyz/src/utils/rpg/assetStore';
 import { callerIp, dayKey } from '../demo/limits';
+import { handleMusicFind } from './musicLibrary';
+import { MUSIC_FIND_PATH } from '../../../korczak-xyz/src/utils/rpg/musicLibrary';
 import { assetContext, handleSelfRig, keepAudio, keepJson, serveReused, serveReusedQueue, type AssetContext } from './assets';
 import { ALLOWED_ORIGINS } from '../sloper/metadata';
 import { SKIN_PATH, SkinRefusal, handleSkin } from './skin';
@@ -754,6 +756,26 @@ export async function handleRpgApi(req: Request, res: Response): Promise<void> {
       reportError('rpgApi.skin', e);
       await flushSentry();
       if (!res.headersSent) res.status(502).json({ reason: 'failed', error: { message: 'skin weights unavailable' } });
+    }
+    return;
+  }
+  // The score library (`musicLibrary.ts`): a track good enough for this world, before one is composed.
+  if (path === MUSIC_FIND_PATH && req.method === 'POST') {
+    try {
+      const uid = await uidOf(req);
+      if (!uid) {
+        res.status(401).json({ reason: 'auth', error: { message: 'music: sign in first' } });
+        return;
+      }
+      await handleMusicFind(uid, bodyOf(req), res);
+    } catch (e) {
+      if (e instanceof GatewayRefusal) {
+        res.status(e.status).json({ reason: e.reason, error: { message: e.message } });
+        return;
+      }
+      reportError('rpgApi.musicFind', e);
+      await flushSentry();
+      if (!res.headersSent) res.status(502).json({ reason: 'failed' });
     }
     return;
   }

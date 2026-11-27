@@ -21,6 +21,8 @@ export const DAILY_CAPS = {
   selfRig: 200,
   /** SkinTokens runs an account may ask for in a day (~half a cent each, on the project). */
   skin: 100,
+  /** Score-library searches an account may make in a day (an embedding each, on the server's key). */
+  musicFind: 200,
 } as const;
 
 export type DailyKind = keyof typeof DAILY_CAPS;
