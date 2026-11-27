@@ -15,9 +15,33 @@ import { endRequest, startRequest, updateRequest, voiceCredits } from './devlog'
 import { outOfFunds } from './funds';
 import { DesignRefused, DESIGN_MODEL, designVoice, findDesigned, previewText, type DesignWho } from './voiceDesign';
 import { FLASH_MODEL, refusedModel, speechRequest, TAG_MODEL, voicing as voicingOf } from './audioTags';
-import { voiceCreditsPerChar } from './cost';
+import { tokenCost, voiceCreditsPerChar } from './cost';
+import {
+  DEFAULT_VOICE_ENGINE,
+  GEMINI_TTS_MODEL,
+  geminiClipOf,
+  geminiSpeechRequest,
+  geminiVoiceFor,
+  mannerTag,
+  clipBlob,
+  type VoiceEngine,
+} from './geminiVoice';
 import type { Lang } from './quest';
 import { normLang } from './language';
+
+/*
+ * Which engine speaks (owner, 27 Nov 2026: Gemini Flash TTS the default, ElevenLabs a choice in
+ * Settings). On Gemini the key passed in is the Google key; `fallback` is an ElevenLabs key, if the
+ * reader has one, for a line Gemini would not speak. The demo always speaks through its function on
+ * ElevenLabs, whatever is chosen here.
+ */
+let engine: VoiceEngine = DEFAULT_VOICE_ENGINE;
+let fallbackKey: string | null = null;
+
+export function setVoiceEngine(next: VoiceEngine, fallback: string | null = null): void {
+  engine = next;
+  fallbackKey = fallback;
+}
 
 /** Flash for every line without an audio tag; a tagged line goes to `TAG_MODEL` (`audioTags.ts`). */
 export const VOICE_MODEL = FLASH_MODEL;
@@ -281,6 +305,43 @@ export function stopVoice(): void {
 }
 
 async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<string> {
+  if (engine === 'gemini' && key !== DEMO_VOICE_KEY) {
+    try {
+      return await geminiFetch(key, line);
+    } catch (e) {
+      // One line Gemini would not speak: ElevenLabs says it, when the reader has a key for it.
+      if (!fallbackKey) throw e;
+      return elevenFetch(fallbackKey, line, lang);
+    }
+  }
+  return elevenFetch(key, line, lang);
+}
+
+/**
+ * A line on Gemini's TTS: the tags in English as ElevenLabs' v4 gets them (Gemini acts them too), the
+ * character's manner as one more tag in front, their prebuilt voice by gender, age and name.
+ */
+async function geminiFetch(key: string, line: SpokenLine): Promise<string> {
+  const text = mannerTag(line.who?.voice) + voicingOf(line.text, true).text;
+  const entry = startRequest('voice', `${GEMINI_TTS_MODEL} · ${line.who?.name ?? line.voice}`, null, text);
+  try {
+    const response = await apiFetch(...geminiSpeechRequest(key, geminiVoiceFor(line.voice, line.who), text));
+    const json = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(json?.error?.message || `Gemini TTS ${response.status}`);
+    const clip = geminiClipOf(json);
+    endRequest(entry, null, {
+      chars: text.length,
+      credits: 0,
+      serverCost: serverCost(response) ?? tokenCost(GEMINI_TTS_MODEL, clip.usage),
+    });
+    return URL.createObjectURL(clipBlob(clip));
+  } catch (e) {
+    endRequest(entry, e instanceof Error ? e.message : String(e));
+    throw e;
+  }
+}
+
+async function elevenFetch(key: string, line: SpokenLine, lang: Lang): Promise<string> {
   // Into the developer console with what it cost: ElevenLabs' own `character-cost` header where the
   // browser is allowed to read it, else the list rate (`cost.ts`).
   // The console shows what was sent, tags and all, under the model that spoke it.
@@ -345,7 +406,7 @@ async function ownClip(key: string, line: SpokenLine, lang: Lang, said = voicing
 }
 
 function clipKey(line: SpokenLine, lang: Lang): string {
-  return `${line.voice}:${line.who?.name ?? ''}:${lang}:${line.text}`;
+  return `${engine}:${line.voice}:${line.who?.name ?? ''}:${lang}:${line.text}`;
 }
 
 function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {
@@ -353,7 +414,7 @@ function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {
   let clip = clips.get(cacheKey);
   // No credits left on the reader's account (`funds.ts`): every line would fail the same way, so
   // none is asked and the game reads in silence. The demo speaks on the owner's account, not theirs.
-  if (!clip && key !== DEMO_VOICE_KEY && outOfFunds('elevenlabs')) return Promise.reject(new Error('skipped: no credits left on ElevenLabs'));
+  if (!clip && key !== DEMO_VOICE_KEY && outOfFunds(engine === 'gemini' ? 'google' : 'elevenlabs') && !fallbackKey) return Promise.reject(new Error(`skipped: no credits left on ${engine === 'gemini' ? 'Google' : 'ElevenLabs'}`));
   if (!clip) {
     clip = fetchClip(key, line, lang);
     clips.set(cacheKey, clip);
@@ -400,6 +461,8 @@ function warmNames(): string[] {
 }
 
 export function warmVoices(key: string, who: readonly VoiceWho[], lang: Lang): void {
+  // Gemini's prebuilt voices have no cold start to cover.
+  if (engine === 'gemini' && key !== DEMO_VOICE_KEY) return;
   const warm = warmNames();
   for (const w of who) {
     // A described voice is a new voice, whatever was warmed under the name before.

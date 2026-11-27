@@ -21,6 +21,9 @@ export const PER_MILLION: [prefix: string, input: number, output: number][] = [
   ['gemini-3.1-pro', 2, 12],
   ['gemini-4-argon', 2, 10],
   ['gemini-3.8-flash', 0.75, 3.75],
+  // Text to speech: the output is audio tokens (~25 a second of speech), the voice of the game (`geminiVoice.ts`).
+  ['gemini-3.8-flash-tts', 0.5, 9],
+  ['gemini-3.8-flash-lite-tts', 0.5, 6],
   ['gemini-3.6-flash', 0.75, 3.75],
   ['gemini-3.5-flash-lite', 0.3, 2.5],
   ['gemini-3.1-flash-lite', 0.25, 1.5],
@@ -44,6 +47,8 @@ export const PRICE_CHANGES: { prefix: string; from: string; input: number; outpu
   { prefix: 'gemini-4-argon', from: '2026-12-01', input: 4, output: 20 },
   { prefix: 'gemini-3.8-flash', from: '2027-01-01', input: 1.5, output: 7.5 },
   { prefix: 'gemini-3.6-flash', from: '2027-01-01', input: 1.5, output: 7.5 },
+  { prefix: 'gemini-3.8-flash-tts', from: '2027-01-01', input: 1, output: 18 },
+  { prefix: 'gemini-3.8-flash-lite-tts', from: '2027-01-01', input: 1, output: 12 },
 ];
 
 /** The row a model is priced by: the longest matching prefix, or null. */

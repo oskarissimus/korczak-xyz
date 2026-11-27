@@ -216,6 +216,10 @@ export function dieselReservation(target: GatewayTarget, method: string, body: R
     const model = /^\/v1beta\/models\/([^:]+):/.exec(target.path)?.[1] ?? '';
     const image = GEMINI_IMAGE_RATES[model];
     if (image) return (bodyChars * image.input + IMAGE_TOKENS * image.image) / 1_000_000;
+    // A spoken line (`geminiVoice.ts`): ~1.7 audio tokens a character measured, reserved at 3, not the
+    // whole output budget a beat may write (that would hold $0.15 for a $0.002 clip).
+    const speech = model.endsWith('-tts') ? tokenPrice(model) : null;
+    if (speech) return (bodyChars * speech.input + bodyChars * 3 * speech.output) / 1_000_000;
     return beatReservation(model, bodyChars) ?? UNKNOWN_USD;
   }
   if (target.provider === 'openai') {

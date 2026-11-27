@@ -2601,6 +2601,35 @@ lack it and answer in the browser's language). `Lang` is now any of them, not `'
 
 ## Voice
 
+**Gemini Flash TTS speaks by default, ElevenLabs is a choice** (owner, 27 Nov 2026: "switch to Gemini
+Flash, keep the setting in Settings, but Gemini Flash the default"). After the ElevenLabs recount that
+day (`VOICE_PRICES` in `cost.ts`) a quest's lines were ~$0.91 on the Creator credits and ~$0.40 on the
+API pricing from 17 Dec, against ~$0.11 on `gemini-3.8-flash-tts` ($0.50 text / $9 audio per 1M tokens,
+both doubling on 1 Jan 2027; ~1.7 audio tokens a character, ~25 a second). `utils/rpg/geminiVoice.ts`
+is the engine:
+- **Who speaks** (`Rpg.tsx`, `speakingEngine`): Gemini on the Google key when *Voice* in Settings → Story
+  is Gemini (localStorage `rpg-voice-engine`, absent = Gemini) or there is no ElevenLabs key; ElevenLabs
+  otherwise. The row is always drawn (disabled, on ElevenLabs, without a Google key) so nothing under it
+  moves when the keys answer. `setVoiceEngine` tells `voice.ts`, with the ElevenLabs key as a fallback
+  for a line Gemini would not speak. **The demo and the intro stay on ElevenLabs** (the demo's function
+  speaks only ElevenLabs; the intro streams `/stream`).
+- **The request** (`geminiSpeechRequest`): `generateContent` through the gateway like any Google call,
+  `responseModalities: ['AUDIO']`, a prebuilt voice by name. The 3.8 TTS models refuse a
+  `systemInstruction` (400) and read style prose aloud, so the manner goes in as bracket tags: the
+  character's `Emotion:` from their voice description (`mannerTag`) in front of the line's own tags,
+  which Gemini acts as v4 does.
+- **The voice** (`geminiVoiceFor`): the hero Orus; a character one of Gemini's prebuilt voices by gender
+  and age, picked by a hash of their name, so the same person always sounds the same. No designed voice,
+  no warm-up (`warmVoices` returns at once), no prefetch of the voice lists.
+- **The answer**: the docs describe raw 16-bit PCM (`audio/L16;rate=24000`); on 27 Nov 2026 the model
+  answered `audio/wav` with the header on. `clipBlob` takes either, by the bytes.
+- **Priced by tokens**: `PER_MILLION`/`PRICE_CHANGES` rows for both TTS models, the console's voice row
+  `gemini-3.8-flash-tts · <name>` with $ from usage (credits 0), diesel's reservation for a `-tts` body
+  (`wallet.ts`), an empty Google balance billed to `google` (`funds.ts`), the quest's diesel estimate by
+  engine (`questVoiceUsd` in `diesel.ts`), and the price list's rows. The clip cache is keyed by engine.
+
+The rest of this section is the ElevenLabs engine.
+
 Both sides of a conversation speak through ElevenLabs (`utils/rpg/voice.ts`, `eleven_flash_v2_5`,
 `eleven_v4` for a line with an audio tag — *Audio tags* below)
 when the store holds an ElevenLabs key: the option the hunter picks in Brian's voice, then the

@@ -82,6 +82,15 @@ const GOOGLE_VERBATIM: Record<string, [input: string, output: string]> = {
     '$3.75 through December 31, 2026. $7.50 starting January 1, 2027.',
   ],
   'gemini-3.5-flash-lite': ['$0.30 (text / image / video / audio)', '$2.50'],
+  // Not copied off Google's page: the rates as three reviews quoted Google's table, read 27 Nov 2026.
+  'gemini-3.8-flash-tts': [
+    '(as quoted, not copied) $0.50 text through December 31, 2026; $1.00 from January 1, 2027.',
+    '(as quoted, not copied) $9.00 audio through December 31, 2026; $18.00 from January 1, 2027.',
+  ],
+  'gemini-3.8-flash-lite-tts': [
+    '(as quoted, not copied) $0.50 text through December 31, 2026; $1.00 from January 1, 2027.',
+    '(as quoted, not copied) $6.00 audio through December 31, 2026; $12.00 from January 1, 2027.',
+  ],
   'gemini-3.1-flash-lite': ['$0.25 (text / image / video) $0.50 (audio)', '$1.50'],
   'gemini-3-flash': ['$0.50 (text / image / video) $1.00 (audio)', '$3.00'],
   'gemini-2.5-pro': ['$1.25, prompts <= 200k tokens', '$10.00, prompts <= 200k tokens'],
@@ -100,9 +109,17 @@ const TYPICAL_TOKENS = L(
   `${TYPICAL_BEAT.input} na wejściu, ${TYPICAL_BEAT.output} na wyjściu, ${TYPICAL_BEAT.thoughts} myślenia (późny krok questa)`,
 );
 
+/** One spoken line on Gemini's TTS, as measured on 27 Nov 2026 (150 characters of Polish, 10 s). */
+const TYPICAL_CLIP = { input: 55, output: 250, thoughts: 0 };
+const TYPICAL_CLIP_TEXT = L(
+  `one line of ${TYPICAL_LINE} characters: ~${TYPICAL_CLIP.input} text tokens in, ~${TYPICAL_CLIP.output} audio tokens out`,
+  `jedna kwestia, ${TYPICAL_LINE} znaków: ~${TYPICAL_CLIP.input} tokenów tekstu, ~${TYPICAL_CLIP.output} tokenów audio`,
+);
+
 function textRows(at: number): PriceRow[] {
   return PER_MILLION.map(([prefix, input, output]) => {
     const openai = prefix.startsWith('gpt-');
+    const tts = prefix.endsWith('-tts');
     const changes = PRICE_CHANGES.filter((c) => c.prefix === prefix);
     const model = prefix === 'gemma-' ? 'gemma-*' : prefix;
     const verbatim = openai
@@ -116,9 +133,11 @@ function textRows(at: number): PriceRow[] {
       model,
       verbatim,
       source: openai ? `${OPENAI_SRC}${prefix}` : GOOGLE_SRC,
-      method: `input × $${input}/1M + (output + thinking) × $${output}/1M, tokens from the answer's usage`,
-      typical: TYPICAL_TOKENS,
-      usd: tokenCost(prefix === 'gemma-' ? 'gemma-4' : prefix, TYPICAL_BEAT, at),
+      method: tts
+        ? `text × $${input}/1M + audio × $${output}/1M, tokens from the answer's usage (~25 audio tokens a second)`
+        : `input × $${input}/1M + (output + thinking) × $${output}/1M, tokens from the answer's usage`,
+      typical: tts ? TYPICAL_CLIP_TEXT : TYPICAL_TOKENS,
+      usd: tokenCost(prefix === 'gemma-' ? 'gemma-4' : prefix, tts ? TYPICAL_CLIP : TYPICAL_BEAT, at),
       note: changes.length
         ? L(
             changes.map((c) => `From ${c.from}: $${c.input} / $${c.output} per 1M — applied automatically on that day.`).join(' '),

@@ -173,7 +173,8 @@ import {
   stopMusic,
   subscribeMusic,
 } from '../../utils/rpg/music';
-import { prefetchLine, prefetchVoices, primeVoice, setVoiceWorld, speakLines, warmVoices, stopVoice, type LineTiming, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
+import { prefetchLine, prefetchVoices, primeVoice, setVoiceEngine, setVoiceWorld, speakLines, warmVoices, stopVoice, type LineTiming, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
+import { DEFAULT_VOICE_ENGINE, voiceEngineOf, type VoiceEngine } from '../../utils/rpg/geminiVoice';
 import { recordVoiceLag } from '../../utils/rpg/voiceLag';
 import { rec, setReplayToken, startFrames, startReplay, waitEnd, waitStart } from '../../utils/rpg/replayRecorder';
 import { trackScene } from './replayScene';
@@ -291,6 +292,8 @@ const languageOptions: [string, string][] = LANGUAGES.map((l): [string, string] 
 const MODEL_KEY = 'rpg-model';
 /** Whether the world and the opening are written quickly (`quick` in `storyteller.ts`); on unless '0'. */
 const FAST_KEY = 'rpg-fast-start';
+/** The voice engine picked in Settings, absent for the default (`geminiVoice.ts`). */
+const VOICE_ENGINE_KEY = 'rpg-voice-engine';
 /** Whether a new world is told as a story while it is made (`utils/rpg/intro.ts`); on unless '0'. */
 const INTRO_KEY = 'rpg-intro';
 /** `text` cut to `n` characters, with an ellipsis when it was longer. */
@@ -434,13 +437,22 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       : demo?.available && !onDiesel
         ? 'demo'
         : 'static';
-  const voiceKey = apiKeys.elevenLabs ?? (storyProvider === 'demo' && demo?.voice ? DEMO_VOICE_KEY : null);
+  // Who speaks (owner, 27 Nov 2026): Gemini Flash TTS on the Google key by default, ElevenLabs when
+  // chosen in Settings; either one stands in when the reader has only the other's key. The demo is
+  // ElevenLabs on its function.
+  const [voiceEngine, setVoiceEnginePick] = useState<VoiceEngine>(DEFAULT_VOICE_ENGINE);
+  const speakingEngine: VoiceEngine = apiKeys.google && (voiceEngine === 'gemini' || !apiKeys.elevenLabs) ? 'gemini' : 'elevenlabs';
+  const voiceKey =
+    speakingEngine === 'gemini'
+      ? apiKeys.google!
+      : (apiKeys.elevenLabs ?? (storyProvider === 'demo' && demo?.voice ? DEMO_VOICE_KEY : null));
+  setVoiceEngine(speakingEngine, speakingEngine === 'gemini' ? (apiKeys.elevenLabs ?? null) : null);
   const [voiceOn, setVoiceOn] = useState(true);
   // The library searches for the reader's own key, so no character's first line waits on one
   // (`voice.ts`); the demo voice picks on the function's side and needs nothing here.
   useEffect(() => {
-    if (voiceOn && voiceKey && voiceKey !== DEMO_VOICE_KEY) prefetchVoices(gameLang);
-  }, [gameLang, voiceKey, voiceOn]);
+    if (voiceOn && voiceKey && voiceKey !== DEMO_VOICE_KEY && speakingEngine === 'elevenlabs') prefetchVoices(gameLang);
+  }, [gameLang, voiceKey, voiceOn, speakingEngine]);
   const voiceRef = useRef<string | null>(null);
   voiceRef.current = voiceOn ? voiceKey : null;
   // The score (`utils/rpg/music.ts`): composed on the reader's own ElevenLabs key only, never the
@@ -2771,6 +2783,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     try {
       setChosenModel(localStorage.getItem(MODEL_KEY));
       setFastStart(localStorage.getItem(FAST_KEY) !== '0');
+      setVoiceEnginePick(voiceEngineOf(localStorage.getItem(VOICE_ENGINE_KEY)));
       setIntroOn(localStorage.getItem(INTRO_KEY) !== '0');
       const keptRigger = localStorage.getItem(RIGGER_KEY);
       setRigger(keptRigger === 'meshy' || keptRigger === 'voxel' || keptRigger === 'fit' || keptRigger === 'skin' ? keptRigger : keptRigger === 'self' || keptRigger === 'pose' ? 'fit' : DEFAULT_RIGGER);
@@ -2785,6 +2798,15 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       /* no storage, the usual order */
     }
   }, []);
+  const pickVoiceEngine = (next: VoiceEngine) => {
+    setVoiceEnginePick(next);
+    try {
+      if (next === DEFAULT_VOICE_ENGINE) localStorage.removeItem(VOICE_ENGINE_KEY);
+      else localStorage.setItem(VOICE_ENGINE_KEY, next);
+    } catch {
+      /* forgotten on reload */
+    }
+  };
   const pickFastStart = (on: boolean) => {
     setFastStart(on);
     try {
@@ -3402,7 +3424,12 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   const dieselModel = modelChain(onDiesel ? (wallet!.server.google ? 'google' : 'openai') : 'demo', chosenModel)[0] ?? null;
   // What a quest and a world cost in all, not only the model's words: the lines, the score and the
   // models are most of it (`questLitres`, measured on the ledger) — and only what is on for this reader.
-  const priceParts = { voice: Boolean(voiceOn && voiceKey), music: Boolean(musicOn && musicKey), fal: Boolean(falKey) };
+  const priceParts = {
+    voice: Boolean(voiceOn && voiceKey),
+    music: Boolean(musicOn && musicKey),
+    fal: Boolean(falKey),
+    voiceEngine: voiceKey === DEMO_VOICE_KEY ? ('elevenlabs' as const) : speakingEngine,
+  };
   const back = (
     <button type="button" className="rpg-menu-back" onClick={() => setMenu('main')}>
       ← {t.menuBack}
@@ -3712,6 +3739,19 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               )}
             {storyProvider !== 'static' && storyProvider !== 'openai' && settingSwitch(t.fastStartTitle, t.fastStartNote(FAST_MODEL), fastStart, pickFastStart)}
             {storyProvider === 'google' && settingSwitch(t.introTitle, t.introNote, introOn, pickIntro)}
+            {/* Always drawn, so the rows under it never move when the keys answer; without a Google key only ElevenLabs can speak. */}
+            {settingSelect(
+              t.voiceEngine,
+              <select
+                value={apiKeys.google ? voiceEngine : 'elevenlabs'}
+                disabled={!apiKeys.google}
+                onChange={(e) => pickVoiceEngine(voiceEngineOf(e.target.value))}
+              >
+                <option value="gemini">{t.voiceEngines.gemini}</option>
+                <option value="elevenlabs">{t.voiceEngines.elevenlabs}</option>
+              </select>,
+              <p className="rpg-set-note">{t.voiceEngineNote}</p>,
+            )}
           </>,
         )}
 
@@ -3797,7 +3837,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                           : t.aiQuest(storyProvider)}
                 </li>
                 {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
-                <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey === ACCOUNT_KEY && !account.keys.elevenLabs ? t.dieselVoice : voiceKey ? t.voiceOn : t.voiceOff}</li>
+                <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey === ACCOUNT_KEY && !(speakingEngine === 'gemini' ? account.keys.google : account.keys.elevenLabs) ? t.dieselVoice(t.voiceEngines[speakingEngine]) : voiceKey ? t.voiceOn(t.voiceEngines[speakingEngine]) : t.voiceOff}</li>
                 {(storyProvider === 'static' || storyProvider === 'demo' || !voiceKey) && (
                   <li className="rpg-set-note">
                     {standalone && auth.user ? (storyProvider === 'demo' ? t.ownKeyBelow : t.addKeyBelow) : storyProvider === 'demo' ? t.ownKey : t.addKey}

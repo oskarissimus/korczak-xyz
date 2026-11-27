@@ -43,6 +43,8 @@ const OWN_GATEWAY = /rpg-credits/i;
 export function providerOf(kind: 'model' | 'voice' | 'fal' | 'music', model: string): FundsProvider {
   // A person's picture from Google's own API is logged with fal's steps, but billed by Google.
   if (kind === 'fal') return model.startsWith('gemini-') ? 'google' : 'fal';
+  // A line on Gemini's TTS (`geminiVoice.ts`) is Google's money, not ElevenLabs'.
+  if (kind === 'voice' && model.startsWith('gemini-')) return 'google';
   if (kind === 'voice' || kind === 'music') return 'elevenlabs';
   return /^(?:gpt|o\d|chatgpt)/i.test(model) ? 'openai' : 'google';
 }

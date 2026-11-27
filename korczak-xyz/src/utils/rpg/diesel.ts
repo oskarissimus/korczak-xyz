@@ -17,6 +17,7 @@
  */
 
 import { musicUsd, tokenCost, voiceCost } from './cost';
+import { GEMINI_TTS_MODEL } from './geminiVoice';
 import { clipCost, priceAs } from './demoLimits';
 import { localeOf } from './language';
 
@@ -61,6 +62,17 @@ const QUEST_BEATS = 6;
  */
 const QUEST_VOICE_CREDITS = 5_000;
 /**
+ * The same quest on Gemini Flash TTS (`geminiVoice.ts`, the default voice since 27 Nov 2026): ~7,000
+ * characters, ~0.37 text and ~1.67 audio tokens a character (one 150-character Polish line measured
+ * that day: 55 in, 250 out), priced at the day's rate: ~$0.11 until 31 Dec 2026, twice that after.
+ */
+const QUEST_VOICE_CHARS = 7_000;
+const GEMINI_VOICE_TOKENS = {
+  input: Math.round(QUEST_VOICE_CHARS * 0.37),
+  output: Math.round(QUEST_VOICE_CHARS * 1.67),
+  thoughts: 0,
+};
+/**
  * The world's score (`music.ts`): one 90-second track a world since 27 Nov 2026 (~1,350 credits, ~$0.25 on the legacy
  * credits, $0.225 on the API pricing), and nothing at all when the library has one good enough — priced as composed, the
  * worst case. Until then a two-minute track was priced into every quest ($0.132).
@@ -76,6 +88,15 @@ export interface PriceParts {
   voice: boolean;
   music: boolean;
   fal: boolean;
+  /** Who speaks; absent is ElevenLabs, as before there was a choice. */
+  voiceEngine?: 'gemini' | 'elevenlabs';
+}
+
+/** A quest's lines in dollars on the engine that speaks them. */
+function questVoiceUsd(parts: PriceParts): number {
+  if (!parts.voice) return 0;
+  if (parts.voiceEngine === 'gemini') return tokenCost(GEMINI_TTS_MODEL, GEMINI_VOICE_TOKENS) ?? 0;
+  return voiceCost(QUEST_VOICE_CREDITS);
 }
 
 /** About what one step of the story costs on `model`, in litres; null for a model with no price. */
@@ -90,7 +111,7 @@ export function questLitres(model: string, parts: PriceParts): number | null {
   if (beat === null) return null;
   return (
     beat * QUEST_BEATS +
-    litres((parts.voice ? voiceCost(QUEST_VOICE_CREDITS) : 0) + (parts.fal ? QUEST_FAL_USD : 0))
+    litres(questVoiceUsd(parts) + (parts.fal ? QUEST_FAL_USD : 0))
   );
 }
 
