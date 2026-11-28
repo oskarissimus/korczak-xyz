@@ -105,6 +105,8 @@ on:
       - "korczak-xyz/src/utils/rpg/wallet.ts"
       - "korczak-xyz/src/utils/rpg/paddle.ts"
       - "korczak-xyz/src/utils/rpg/language.ts"
+      # The voice engines and Gemini's TTS request: the demo speaks through them, and diesel prices by them.
+      - "korczak-xyz/src/utils/rpg/geminiVoice.ts"
       - "korczak-xyz/src/utils/rpg/tsconfig.json"
       - "terraform/**"
       # The RPG production project has its own workflow (rpg-terraform.yml) and nothing here reads it.

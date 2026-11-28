@@ -63,6 +63,18 @@ import {
 } from '../../../korczak-xyz/src/utils/rpg/demoLimits';
 import { beatPrompt } from '../../../korczak-xyz/src/utils/rpg/quest';
 import { FLASH_MODEL, refusedModel, speechRequest, TAG_MODEL, voicing } from '../../../korczak-xyz/src/utils/rpg/audioTags';
+import {
+  geminiClipOf,
+  geminiClipUsage,
+  geminiModelOf,
+  geminiSpeechRequest,
+  geminiVoiceFor,
+  isGemini,
+  mannerTag,
+  pcmToWav,
+  voiceEngineOf,
+  type VoiceEngine,
+} from '../../../korczak-xyz/src/utils/rpg/geminiVoice';
 import { demoGenesis, genesisPrompt, genesisTemperature } from '../../../korczak-xyz/src/utils/rpg/genesis';
 import {
   asAge,
@@ -298,8 +310,9 @@ async function status(req: Request, res: Response): Promise<void> {
   const verdict = keys.google ? checkRpgDemo(settings, spent, 0.01) : ({ ok: false, reason: 'no-key' } as const);
   res.status(200).json({
     available: verdict.ok,
-    // Whether the paying account has a voice key at all — said, never which key.
-    voice: keys.elevenLabs !== null,
+    // Whether the paying account can speak at all, and on which engines — said, never which key.
+    voice: keys.elevenLabs !== null || keys.google !== null,
+    voiceEngines: { gemini: keys.google !== null, elevenlabs: keys.elevenLabs !== null },
     reason: verdict.ok ? null : verdict.reason,
     remaining: remainingUsd(settings, spent),
     perIpUsd: settings.perIpUsd,
@@ -545,7 +558,8 @@ function speaker(raw: unknown): VoiceWho | null {
   const name = typeof r.name === 'string' ? r.name.trim().slice(0, 60) : '';
   if (!name) return null;
   const age = asAge(r.age);
-  return { name, gender: r.gender === 'female' ? 'female' : 'male', ...(age && { age }) };
+  const voice = typeof r.voice === 'string' ? r.voice.slice(0, 600) : '';
+  return { name, gender: r.gender === 'female' ? 'female' : 'male', ...(age && { age }), ...(voice && { voice }) };
 }
 
 function speak(key: string, voiceId: string, text: string, lang: string, model: string): Promise<globalThis.Response> {
@@ -558,13 +572,25 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
   const voice = (Object.keys(DEMO_VOICES) as DemoVoice[]).find((v) => v === body.voice);
   if (!voice) throw new BadRequest('Unknown voice');
   const lang = normLang(body.lang);
+  // Who speaks is the game's one switch (`geminiVoice.ts`, owner, 28 Nov 2026): Gemini, unless the page
+  // asks for ElevenLabs; either stands in when the owner's account has only the other's key. A page
+  // from before the switch sends no engine and gets the default.
+  const settingsFirst = await readSettings();
+  const keysFirst = await demoKeys(settingsFirst.keyUid);
+  const asked = voiceEngineOf(body.engine);
+  const engine: VoiceEngine =
+    keysFirst.google && (isGemini(asked) || !keysFirst.elevenLabs) ? (isGemini(asked) ? asked : 'gemini-lite') : 'elevenlabs';
+  if (isGemini(engine)) {
+    await geminiClip(req, res, { text, voice, lang, who: voice === 'player' ? null : speaker(body.who), engine, body, google: keysFirst.google! });
+    return;
+  }
   // A line with an audio tag goes to v4 at its own rate, the rest to Flash (`audioTags.ts`); the
   // reservation is the tagged price, and a fall back to Flash settles at Flash's.
   let said = voicing(text);
   const cost = clipCost(said.text.length, said.model);
   const started = Date.now();
 
-  const settings = await readSettings();
+  const settings = settingsFirst;
   const day = dayKey();
   const ip = callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip);
   const guest: Guest = { id: guestIdOf(body.guest), ask: { kind: 'voice', usd: cost } };
@@ -659,6 +685,92 @@ async function clip(req: Request, res: Response, body: Record<string, unknown>):
     res.set('x-demo-cost', String(spent));
     res.set('x-demo-model', said.model);
     res.set('x-demo-voice', spoken);
+    res.set('x-demo-remaining', JSON.stringify(remainingUsd(settings, claimed.spent)));
+    res.send(audio);
+  } finally {
+    await settle(day, ip, cost, spent, guest).catch((e) => reportError('rpgDemo.settle', e));
+  }
+}
+
+/**
+ * A demo line on Gemini's TTS: reserved at a generous guess of its tokens (`geminiClipUsage`), settled
+ * at the answer's own usage, logged like any other paid request, answered as WAV.
+ */
+async function geminiClip(
+  req: Request,
+  res: Response,
+  o: { text: string; voice: DemoVoice; lang: string; who: VoiceWho | null; engine: VoiceEngine; body: Record<string, unknown>; google: string },
+): Promise<void> {
+  const model = geminiModelOf(o.engine);
+  const said = mannerTag(o.who?.voice) + voicing(o.text, true).text;
+  const started = Date.now();
+  const cost = tokenCost(model, geminiClipUsage(said.length), started) ?? 0.01;
+  const settings = await readSettings();
+  const day = dayKey();
+  const ip = callerIp(req.headers['x-forwarded-for'] as string | undefined, req.ip);
+  const guest: Guest = { id: guestIdOf(o.body.guest), ask: { kind: 'voice', usd: cost } };
+  const claimed = await reserve(settings, day, ip, cost, guest);
+  if (!claimed.ok) {
+    res.status(claimed.status).json({ reason: claimed.reason, detail: { message: `demo: ${claimed.reason}` } });
+    return;
+  }
+  let spent = cost;
+  try {
+    const voiceName = geminiVoiceFor(o.voice, o.who ?? undefined);
+    const [url, init] = geminiSpeechRequest(o.google, voiceName, said, model);
+    const upstream = await fetch(url, init);
+    const raw = Buffer.from(await upstream.arrayBuffer());
+    let json: unknown = null;
+    try {
+      json = JSON.parse(raw.toString('utf8'));
+    } catch {
+      /* said below */
+    }
+    let audio: Buffer | null = null;
+    let usage: { input: number; output: number; thoughts: number } | null = null;
+    let failure = upstream.ok ? null : `Gemini TTS ${upstream.status}`;
+    if (upstream.ok) {
+      try {
+        const clip = geminiClipOf(json);
+        usage = clip.usage;
+        const riff = clip.pcm.length > 12 && Buffer.from(clip.pcm.subarray(0, 4)).toString('latin1') === 'RIFF';
+        audio = riff ? Buffer.from(clip.pcm) : Buffer.from(await pcmToWav(clip.pcm, clip.rate).arrayBuffer());
+      } catch (e) {
+        failure = e instanceof Error ? e.message : String(e);
+      }
+    }
+    spent = audio ? (usage ? (tokenCost(model, usage, started) ?? cost) : cost) : 0;
+    await logDemoRequest({
+      at: started,
+      ip: ipKey(ip, day),
+      provider: 'google',
+      host: 'generativelanguage.googleapis.com',
+      path: `/v1beta/models/${model}:generateContent`,
+      model,
+      status: upstream.status,
+      usd: spent,
+      source: usage ? 'usage' : 'list',
+      basis: usage ? `${model}: ${tokenBasis(model, usage, tokenPrice(model, started))}` : failure ? 'refused: nothing paid' : 'no usage: the reservation kept',
+      usage: usage ?? undefined,
+      reservedUsd: cost,
+      requestBytes: said.length,
+      url,
+      sent: { text: said, voice: voiceName, model },
+      upstream,
+      contentType: upstream.headers.get('content-type') ?? '',
+      bytes: audio ?? raw,
+      total: (audio ?? raw).length,
+    });
+    if (!audio) {
+      reportError('rpgDemo.geminiVoice', new Error(failure ?? 'no audio'), { status: upstream.status });
+      res.status(502).json({ reason: 'provider', detail: { message: failure ?? 'Gemini TTS: no audio' } });
+      return;
+    }
+    res.status(200);
+    res.set('Content-Type', 'audio/wav');
+    res.set('x-demo-cost', String(spent));
+    res.set('x-demo-model', model);
+    res.set('x-demo-voice', voiceName);
     res.set('x-demo-remaining', JSON.stringify(remainingUsd(settings, claimed.spent)));
     res.send(audio);
   } finally {

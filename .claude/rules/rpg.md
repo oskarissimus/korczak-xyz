@@ -220,8 +220,8 @@ the overlay is `.rpg-intro` in `Rpg.tsx`.
 
 - **Only on *New world*** (`createWorld`, which also covers *Dokończ rodzący się świat*), only with
   the reader's own Google key (`storyProvider === 'google'`), behind the Settings checkbox (localStorage
-  `rpg-intro`, on unless `'0'`). The voice needs an ElevenLabs key (never the demo's), the pictures a
-  fal.ai key; without either the frame is words on the dark for a reader's time (`readingMs`).
+  `rpg-intro`, on unless `'0'`). The voice is the game's voice engine (since 28 Nov 2026 Gemini by
+  default, *Voice* below; ElevenLabs as described here when chosen), the pictures a fal.ai key; without either the frame is words on the dark for a reader's time (`readingMs`).
 - **Ordered for the first sound.** At the click a fixed prologue (`prologue`, the same words every
   time) starts at once, through ElevenLabs' streaming endpoint (`/v1/text-to-speech/{id}/stream`) fed
   into a `MediaSource` as it arrives (`playStream` in `voice.ts`; an iPhone, with no plain
@@ -2601,18 +2601,29 @@ lack it and answer in the browser's language). `Lang` is now any of them, not `'
 
 ## Voice
 
-**Gemini Flash TTS speaks by default, ElevenLabs is a choice** (owner, 27 Nov 2026: "switch to Gemini
-Flash, keep the setting in Settings, but Gemini Flash the default"). After the ElevenLabs recount that
+**Gemini Flash-Lite TTS speaks by default, Flash and ElevenLabs are choices, and one switch moves every
+voice** (owner, 27 Nov 2026: "switch to Gemini Flash, keep the setting in Settings, but Gemini Flash the
+default"; 28 Nov: "the demo and the intro on that key too, the switch changes which provider is used for
+everything", "and Gemini Flash-Lite the default"). After the ElevenLabs recount that
 day (`VOICE_PRICES` in `cost.ts`) a quest's lines were ~$0.91 on the Creator credits and ~$0.40 on the
-API pricing from 17 Dec, against ~$0.11 on `gemini-3.8-flash-tts` ($0.50 text / $9 audio per 1M tokens,
-both doubling on 1 Jan 2027; ~1.7 audio tokens a character, ~25 a second). `utils/rpg/geminiVoice.ts`
+API pricing from 17 Dec, against ~$0.11 on `gemini-3.8-flash-tts` ($0.50 text / $9 audio per 1M tokens) and ~$0.07 on
+`gemini-3.8-flash-lite-tts` ($6 audio), both doubling on 1 Jan 2027; ~1.7 audio tokens a character, ~25 a
+second. `VoiceEngine` is `gemini-lite` | `gemini` | `elevenlabs` (`geminiModelOf`, `isGemini`). `utils/rpg/geminiVoice.ts`
 is the engine:
-- **Who speaks** (`Rpg.tsx`, `speakingEngine`): Gemini on the Google key when *Voice* in Settings → Story
-  is Gemini (localStorage `rpg-voice-engine`, absent = Gemini) or there is no ElevenLabs key; ElevenLabs
-  otherwise. The row is always drawn (disabled, on ElevenLabs, without a Google key) so nothing under it
-  moves when the keys answer. `setVoiceEngine` tells `voice.ts`, with the ElevenLabs key as a fallback
-  for a line Gemini would not speak. **The demo and the intro stay on ElevenLabs** (the demo's function
-  speaks only ElevenLabs; the intro streams `/stream`).
+- **Who speaks** (`Rpg.tsx`, `speakingEngine`): the engine picked in *Voice*, Settings → Story
+  (localStorage `rpg-voice-engine`, absent = Flash-Lite), when a key for its provider exists — the
+  reader's own, the account's on diesel, or the owner's on the demo (`RpgDemoStatus.voiceEngines`) —
+  else whichever provider has one. The row is always drawn (an engine with no key is a disabled option,
+  the whole select disabled with no Gemini) so nothing under it moves when the keys answer.
+  `setVoiceEngine` tells `voice.ts`, with the reader's ElevenLabs key as a fallback for a line Gemini
+  would not speak.
+- **The demo** sends `engine` with each clip (`demoFetch`); `rpgDemo` speaks it on the owner's Google key
+  (`geminiClip` in `functions/src/rpg/handler.ts`), reserved at `geminiClipUsage`'s generous guess, settled
+  at the answer's usage, logged as a `google` request, answered as WAV with `x-demo-model`/`x-demo-cost`.
+  No `engine` (a page from before) is the default; ElevenLabs only when asked for or the only key.
+  `geminiVoice.ts` is in the functions' tsconfig and `firebase-deploy.yml`'s paths for it.
+- **The intro** takes `engine` too: on Gemini its narrator is `Sadaltager` (`GEMINI_NARRATOR_VOICE`), each
+  frame and the prologue a whole clip (no streaming endpoint), two at a time as before.
 - **The request** (`geminiSpeechRequest`): `generateContent` through the gateway like any Google call,
   `responseModalities: ['AUDIO']`, a prebuilt voice by name. The 3.8 TTS models refuse a
   `systemInstruction` (400) and read style prose aloud, so the manner goes in as bracket tags: the

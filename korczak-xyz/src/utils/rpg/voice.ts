@@ -18,7 +18,8 @@ import { FLASH_MODEL, refusedModel, speechRequest, TAG_MODEL, voicing as voicing
 import { tokenCost, voiceCreditsPerChar } from './cost';
 import {
   DEFAULT_VOICE_ENGINE,
-  GEMINI_TTS_MODEL,
+  geminiModelOf,
+  isGemini,
   geminiClipOf,
   geminiSpeechRequest,
   geminiVoiceFor,
@@ -30,10 +31,10 @@ import type { Lang } from './quest';
 import { normLang } from './language';
 
 /*
- * Which engine speaks (owner, 27 Nov 2026: Gemini Flash TTS the default, ElevenLabs a choice in
- * Settings). On Gemini the key passed in is the Google key; `fallback` is an ElevenLabs key, if the
- * reader has one, for a line Gemini would not speak. The demo always speaks through its function on
- * ElevenLabs, whatever is chosen here.
+ * Which engine speaks (owner, 27–28 Nov 2026: Gemini Flash-Lite TTS the default, Flash or ElevenLabs a
+ * choice in Settings, and the one switch for the demo and the intro too). On Gemini the key passed in
+ * is the Google key; `fallback` is an ElevenLabs key, if the reader has one, for a line Gemini would
+ * not speak. The demo speaks through its function on the engine named here (`demoFetch`).
  */
 let engine: VoiceEngine = DEFAULT_VOICE_ENGINE;
 let fallbackKey: string | null = null;
@@ -305,7 +306,8 @@ export function stopVoice(): void {
 }
 
 async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<string> {
-  if (engine === 'gemini' && key !== DEMO_VOICE_KEY) {
+  if (key === DEMO_VOICE_KEY) return demoFetch(line, lang);
+  if (isGemini(engine)) {
     try {
       return await geminiFetch(key, line);
     } catch (e) {
@@ -322,17 +324,18 @@ async function fetchClip(key: string, line: SpokenLine, lang: Lang): Promise<str
  * character's manner as one more tag in front, their prebuilt voice by gender, age and name.
  */
 async function geminiFetch(key: string, line: SpokenLine): Promise<string> {
+  const model = geminiModelOf(engine);
   const text = mannerTag(line.who?.voice) + voicingOf(line.text, true).text;
-  const entry = startRequest('voice', `${GEMINI_TTS_MODEL} · ${line.who?.name ?? line.voice}`, null, text);
+  const entry = startRequest('voice', `${model} · ${line.who?.name ?? line.voice}`, null, text);
   try {
-    const response = await apiFetch(...geminiSpeechRequest(key, geminiVoiceFor(line.voice, line.who), text));
+    const response = await apiFetch(...geminiSpeechRequest(key, geminiVoiceFor(line.voice, line.who), text, model));
     const json = await response.json().catch(() => null);
     if (!response.ok) throw new Error(json?.error?.message || `Gemini TTS ${response.status}`);
     const clip = geminiClipOf(json);
     endRequest(entry, null, {
       chars: text.length,
       credits: 0,
-      serverCost: serverCost(response) ?? tokenCost(GEMINI_TTS_MODEL, clip.usage),
+      serverCost: serverCost(response) ?? tokenCost(model, clip.usage),
     });
     return URL.createObjectURL(clipBlob(clip));
   } catch (e) {
@@ -348,17 +351,8 @@ async function elevenFetch(key: string, line: SpokenLine, lang: Lang): Promise<s
   let said = voicing(line.text);
   const entry = startRequest('voice', `${said.model} · ${line.who?.name ?? line.voice}`, null, said.text);
   try {
-    const demo = key === DEMO_VOICE_KEY;
-    const demoUrl = demo ? rpgDemoUrl() : null;
-    if (demo && !demoUrl) throw new Error('demo: no address');
-    let response = demoUrl
-      ? await fetch(demoUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ kind: 'voice', text: line.text, voice: line.voice, who: line.who, lang, guest: guestId() }),
-        })
-      : await ownClip(key, line, lang, said);
-    if (!demoUrl && !response.ok && said.model === TAG_MODEL && refusedModel(response.status)) {
+    let response = await ownClip(key, line, lang, said);
+    if (!response.ok && said.model === TAG_MODEL && refusedModel(response.status)) {
       // v4 would not: the same line without its tags, on Flash, and Flash from now on.
       tagsOff = true;
       said = voicing(line.text);
@@ -370,12 +364,45 @@ async function elevenFetch(key: string, line: SpokenLine, lang: Lang): Promise<s
       throw new Error(error?.detail?.message || error?.detail || `ElevenLabs ${response.status}`);
     }
     const url = URL.createObjectURL(await response.blob());
-    // The demo says which model it used (`x-demo-model`); the rate follows the model.
-    const model = response.headers.get('x-demo-model') ?? said.model;
     endRequest(entry, null, {
       chars: said.text.length,
-      credits: voiceCredits(said.text.length, response.headers.get('character-cost'), voiceCreditsPerChar(model)),
+      credits: voiceCredits(said.text.length, response.headers.get('character-cost'), voiceCreditsPerChar(said.model)),
       serverCost: serverCost(response),
+    });
+    return url;
+  } catch (e) {
+    endRequest(entry, e instanceof Error ? e.message : String(e));
+    throw e;
+  }
+}
+
+/**
+ * Through the demo function on the owner's keys, on the engine chosen here; it answers which model
+ * spoke (`x-demo-model`) and what the clip cost (`x-demo-cost`). A function deployed before 28 Nov
+ * 2026 ignores `engine` and speaks ElevenLabs.
+ */
+async function demoFetch(line: SpokenLine, lang: Lang): Promise<string> {
+  const entry = startRequest('voice', `demo · ${engine} · ${line.who?.name ?? line.voice}`, null, line.text);
+  try {
+    const demoUrl = rpgDemoUrl();
+    if (!demoUrl) throw new Error('demo: no address');
+    const response = await fetch(demoUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'voice', text: line.text, voice: line.voice, who: line.who, lang, guest: guestId(), engine }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error?.detail?.message || error?.detail || `demo voice ${response.status}`);
+    }
+    const url = URL.createObjectURL(await response.blob());
+    const model = response.headers.get('x-demo-model') ?? 'eleven_flash_v2_5';
+    const cost = Number(response.headers.get('x-demo-cost'));
+    updateRequest(entry, { model: `${model} · ${line.who?.name ?? line.voice}` });
+    endRequest(entry, null, {
+      chars: line.text.length,
+      credits: model.startsWith('eleven') ? voiceCredits(line.text.length, null, voiceCreditsPerChar(model)) : 0,
+      serverCost: Number.isFinite(cost) && response.headers.get('x-demo-cost') !== null ? cost : null,
     });
     return url;
   } catch (e) {
@@ -414,7 +441,7 @@ function clipFor(key: string, line: SpokenLine, lang: Lang): Promise<string> {
   let clip = clips.get(cacheKey);
   // No credits left on the reader's account (`funds.ts`): every line would fail the same way, so
   // none is asked and the game reads in silence. The demo speaks on the owner's account, not theirs.
-  if (!clip && key !== DEMO_VOICE_KEY && outOfFunds(engine === 'gemini' ? 'google' : 'elevenlabs') && !fallbackKey) return Promise.reject(new Error(`skipped: no credits left on ${engine === 'gemini' ? 'Google' : 'ElevenLabs'}`));
+  if (!clip && key !== DEMO_VOICE_KEY && outOfFunds(isGemini(engine) ? 'google' : 'elevenlabs') && !fallbackKey) return Promise.reject(new Error(`skipped: no credits left on ${isGemini(engine) ? 'Google' : 'ElevenLabs'}`));
   if (!clip) {
     clip = fetchClip(key, line, lang);
     clips.set(cacheKey, clip);
@@ -462,7 +489,7 @@ function warmNames(): string[] {
 
 export function warmVoices(key: string, who: readonly VoiceWho[], lang: Lang): void {
   // Gemini's prebuilt voices have no cold start to cover.
-  if (engine === 'gemini' && key !== DEMO_VOICE_KEY) return;
+  if (isGemini(engine)) return;
   const warm = warmNames();
   for (const w of who) {
     // A described voice is a new voice, whatever was warmed under the name before.

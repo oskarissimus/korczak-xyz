@@ -17,14 +17,30 @@
 
 import type { VoiceWho } from './voicePick';
 
-/** The default voice engine's model; Flash-Lite is the cheaper sibling ($6 against $9 per 1M audio tokens). */
+/** Gemini Flash TTS; `GEMINI_LITE_TTS_MODEL` is the cheaper sibling ($6 against $9 per 1M audio tokens). */
 export const GEMINI_TTS_MODEL = 'gemini-3.8-flash-tts';
+export const GEMINI_LITE_TTS_MODEL = 'gemini-3.8-flash-lite-tts';
 
-export type VoiceEngine = 'gemini' | 'elevenlabs';
-export const DEFAULT_VOICE_ENGINE: VoiceEngine = 'gemini';
+/**
+ * Who speaks, everywhere the game speaks: the quest's lines, the intro's narrator and the demo
+ * (owner, 28 Nov 2026: "the demo and the intro on that key too, one switch for the provider";
+ * "Gemini Flash Lite the default"). Two Gemini models and ElevenLabs.
+ */
+export type VoiceEngine = 'gemini-lite' | 'gemini' | 'elevenlabs';
+export const DEFAULT_VOICE_ENGINE: VoiceEngine = 'gemini-lite';
+export const VOICE_ENGINES: readonly VoiceEngine[] = ['gemini-lite', 'gemini', 'elevenlabs'];
 
-export function voiceEngineOf(stored: string | null): VoiceEngine {
-  return stored === 'elevenlabs' ? 'elevenlabs' : DEFAULT_VOICE_ENGINE;
+export function isGemini(engine: VoiceEngine): engine is 'gemini-lite' | 'gemini' {
+  return engine !== 'elevenlabs';
+}
+
+/** The TTS model a Gemini engine speaks with. */
+export function geminiModelOf(engine: VoiceEngine): string {
+  return engine === 'gemini' ? GEMINI_TTS_MODEL : GEMINI_LITE_TTS_MODEL;
+}
+
+export function voiceEngineOf(stored: unknown): VoiceEngine {
+  return VOICE_ENGINES.find((e) => e === stored) ?? DEFAULT_VOICE_ENGINE;
 }
 
 /**
@@ -189,4 +205,13 @@ export function pcmToWav(pcm: Uint8Array, rate: number): Blob {
   ascii(36, 'data');
   v.setUint32(40, pcm.length, true);
   return new Blob([header, pcm as BlobPart], { type: 'audio/wav' });
+}
+
+/**
+ * What a clip of `chars` characters may use, for a reservation made before it is spoken: ~0.37 text
+ * and ~1.67 audio tokens a character were measured (27 Nov 2026), so this asks for more of both, the
+ * manner tag included. The clip settles at its own usage.
+ */
+export function geminiClipUsage(chars: number): { input: number; output: number; thoughts: number } {
+  return { input: Math.ceil(chars * 0.6) + 20, output: Math.ceil(chars * 2.5) + 50, thoughts: 0 };
 }

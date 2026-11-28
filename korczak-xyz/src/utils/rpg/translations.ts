@@ -59,7 +59,7 @@ const en = {
   voiceOff: 'Voice: none, there is no Google or ElevenLabs key.',
   demoQuest: (signup: string) =>
     `Story: written by Gemini, no key or account needed: as a guest you get one world and the first step of one quest. An account starts with ${signup} of diesel.`,
-  demoVoice: 'Voice: ElevenLabs, on the demo.',
+  demoVoice: (engine: string) => `Voice: ${engine}, on the demo.`,
   demoClosed(reason: RpgDemoReason): string {
     return reason === 'guest-done'
       ? this.demoClosedGuest
@@ -111,13 +111,13 @@ const en = {
   dieselQuest: (left: string) => `Story: written by Gemini on the game's keys, paid in diesel. ${left} in your tank.`,
   dieselVoice: (engine: string) => `Voice: ${engine} on the game's keys, paid in diesel.`,
   voiceEngine: 'Voice',
-  voiceEngineNote: 'Gemini Flash costs several times less and acts the sighs and coughs; ElevenLabs gives every character a voice of their own.',
-  voiceEngines: { gemini: 'Gemini Flash TTS', elevenlabs: 'ElevenLabs' },
+  voiceEngineNote: 'Every voice in the game: the lines, the intro and the demo. Gemini Flash-Lite is the cheapest, Flash a little richer, and both act the sighs and coughs; ElevenLabs gives every character a voice of their own.',
+  voiceEngines: { 'gemini-lite': 'Gemini Flash-Lite TTS', gemini: 'Gemini Flash TTS', elevenlabs: 'ElevenLabs' },
   dieselTankEmpty: 'Out of diesel: the generator has stopped and the data centre is dark. Until a refill, the story is the hand-written quest — or set keys of your own on the account page.',
   dieselTankSoon: 'Canisters are not on sale yet: a tap only shows the refuelling. Your own keys on the account page play without diesel.',
   dieselOut: 'Out of diesel',
   dieselOutWhat: 'Your tank is empty, so the game cannot ask the models on its keys any more. Keys of your own on the account page play without diesel.',
-  voiceFailed: 'ElevenLabs did not answer, the line is text only.',
+  voiceFailed: 'The voice did not answer, the line is text only.',
   fundsTitle: (name: string) => `${name}: out of money`,
   fundsWhat(p: FundsProvider): string {
     return p === 'fal' ? this.fundsWhatFal : p === 'elevenlabs' ? this.fundsWhatVoice : this.fundsWhatStory;
@@ -451,7 +451,7 @@ const pl: typeof en = {
   voiceOff: 'Głos: brak, nie ma klucza Google ani ElevenLabs.',
   demoQuest: (signup) =>
     `Fabuła: pisze Gemini, bez klucza i bez konta: jako gość masz jeden świat i pierwszy krok jednego questa. Konto zaczyna z ${signup} dizla.`,
-  demoVoice: 'Głos: ElevenLabs, w trybie demo.',
+  demoVoice: (engine: string) => `Głos: ${engine}, w trybie demo.`,
   demoClosed(reason: RpgDemoReason): string {
     return reason === 'guest-done'
       ? this.demoClosedGuest
@@ -508,13 +508,13 @@ const pl: typeof en = {
   dieselQuest: (left) => `Fabuła: pisze Gemini na kluczach gry, płacisz dizlem. W baku: ${left}.`,
   dieselVoice: (engine: string) => `Głos: ${engine} na kluczach gry, płacisz dizlem.`,
   voiceEngine: 'Głos',
-  voiceEngineNote: 'Gemini Flash kosztuje kilka razy mniej i odgrywa westchnienia i kaszel; ElevenLabs daje każdej postaci własny głos.',
-  voiceEngines: { gemini: 'Gemini Flash TTS', elevenlabs: 'ElevenLabs' },
+  voiceEngineNote: 'Każdy głos w grze: kwestie, intro i demo. Gemini Flash-Lite jest najtańszy, Flash trochę bogatszy, oba odgrywają westchnienia i kaszel; ElevenLabs daje każdej postaci własny głos.',
+  voiceEngines: { 'gemini-lite': 'Gemini Flash-Lite TTS', gemini: 'Gemini Flash TTS', elevenlabs: 'ElevenLabs' },
   dieselTankEmpty: 'Skończył się dizel: generator stanął, w data center zgasło światło. Do dolania gra ma tylko ręcznie napisany quest — albo ustaw własne klucze na stronie konta.',
   dieselTankSoon: 'Kanistrów jeszcze nie można kupić: kliknięcie pokazuje tylko tankowanie. Z własnymi kluczami na stronie konta grasz bez dizla.',
   dieselOut: 'Skończył się dizel',
   dieselOutWhat: 'Bak jest pusty, więc gra nie może już pytać modeli na swoich kluczach. Z własnymi kluczami na stronie konta grasz bez dizla.',
-  voiceFailed: 'ElevenLabs nie odpowiedział, kwestia jest tylko tekstem.',
+  voiceFailed: 'Głos nie odpowiedział, kwestia jest tylko tekstem.',
   fundsTitle: (name: string) => `${name}: skończyły się środki`,
   fundsWhat(p: FundsProvider): string {
     return p === 'fal' ? this.fundsWhatFal : p === 'elevenlabs' ? this.fundsWhatVoice : this.fundsWhatStory;

@@ -18,6 +18,8 @@ export interface RpgDemoStatus {
   reason: RpgDemoReason | null;
   /** Whether the paying account can speak at all. */
   voice: boolean;
+  /** Which engines it can speak on; null from a function older than 28 Nov 2026 (ElevenLabs only). */
+  voiceEngines: { gemini: boolean; elevenlabs: boolean } | null;
   /** Dollars left today: `ip` for this address, `all` for everybody. */
   remaining: { ip: number; all: number };
   perIpUsd: number;
@@ -84,6 +86,13 @@ export async function fetchRpgDemoStatus(signal?: AbortSignal): Promise<RpgDemoS
       available: raw.available === true,
       reason: typeof raw.reason === 'string' ? (raw.reason as RpgDemoReason) : null,
       voice: raw.voice === true,
+      voiceEngines:
+        raw.voiceEngines && typeof raw.voiceEngines === 'object'
+          ? {
+              gemini: (raw.voiceEngines as Record<string, unknown>).gemini === true,
+              elevenlabs: (raw.voiceEngines as Record<string, unknown>).elevenlabs === true,
+            }
+          : null,
       remaining: { ip: num(remaining.ip), all: num(remaining.all) },
       perIpUsd: num(raw.perIpUsd),
       dailyUsd: num(raw.dailyUsd),

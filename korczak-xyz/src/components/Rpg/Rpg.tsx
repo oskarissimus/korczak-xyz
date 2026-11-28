@@ -174,7 +174,7 @@ import {
   subscribeMusic,
 } from '../../utils/rpg/music';
 import { prefetchLine, prefetchVoices, primeVoice, setVoiceEngine, setVoiceWorld, speakLines, warmVoices, stopVoice, type LineTiming, type SpokenLine, type VoiceName } from '../../utils/rpg/voice';
-import { DEFAULT_VOICE_ENGINE, voiceEngineOf, type VoiceEngine } from '../../utils/rpg/geminiVoice';
+import { DEFAULT_VOICE_ENGINE, isGemini, VOICE_ENGINES, voiceEngineOf, type VoiceEngine } from '../../utils/rpg/geminiVoice';
 import { recordVoiceLag } from '../../utils/rpg/voiceLag';
 import { rec, setReplayToken, startFrames, startReplay, waitEnd, waitStart } from '../../utils/rpg/replayRecorder';
 import { trackScene } from './replayScene';
@@ -437,16 +437,24 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
       : demo?.available && !onDiesel
         ? 'demo'
         : 'static';
-  // Who speaks (owner, 27 Nov 2026): Gemini Flash TTS on the Google key by default, ElevenLabs when
-  // chosen in Settings; either one stands in when the reader has only the other's key. The demo is
-  // ElevenLabs on its function.
+  // Who speaks, one switch for everything that speaks — the quest's lines, the intro, the demo (owner,
+  // 27–28 Nov 2026): Gemini Flash-Lite TTS by default, Flash or ElevenLabs chosen in Settings; whichever
+  // provider has a key stands in when the chosen one has none. The demo speaks on the owner's keys
+  // through its function, on the engine chosen here.
   const [voiceEngine, setVoiceEnginePick] = useState<VoiceEngine>(DEFAULT_VOICE_ENGINE);
-  const speakingEngine: VoiceEngine = apiKeys.google && (voiceEngine === 'gemini' || !apiKeys.elevenLabs) ? 'gemini' : 'elevenlabs';
+  const demoVoice = storyProvider === 'demo' && Boolean(demo?.voice);
+  const geminiCan = Boolean(apiKeys.google) || (demoVoice && Boolean(demo?.voiceEngines?.gemini));
+  const elevenCan = Boolean(apiKeys.elevenLabs) || (demoVoice && (demo?.voiceEngines?.elevenlabs ?? true));
+  const speakingEngine: VoiceEngine = isGemini(voiceEngine)
+    ? geminiCan || !elevenCan
+      ? voiceEngine
+      : 'elevenlabs'
+    : elevenCan || !geminiCan
+      ? 'elevenlabs'
+      : DEFAULT_VOICE_ENGINE;
   const voiceKey =
-    speakingEngine === 'gemini'
-      ? apiKeys.google!
-      : (apiKeys.elevenLabs ?? (storyProvider === 'demo' && demo?.voice ? DEMO_VOICE_KEY : null));
-  setVoiceEngine(speakingEngine, speakingEngine === 'gemini' ? (apiKeys.elevenLabs ?? null) : null);
+    (isGemini(speakingEngine) ? apiKeys.google : apiKeys.elevenLabs) ?? (demoVoice ? DEMO_VOICE_KEY : null);
+  setVoiceEngine(speakingEngine, isGemini(speakingEngine) && voiceKey !== DEMO_VOICE_KEY ? (apiKeys.elevenLabs ?? null) : null);
   const [voiceOn, setVoiceOn] = useState(true);
   // The library searches for the reader's own key, so no character's first line waits on one
   // (`voice.ts`); the demo voice picks on the function's side and needs nothing here.
@@ -455,6 +463,8 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
   }, [gameLang, voiceKey, voiceOn, speakingEngine]);
   const voiceRef = useRef<string | null>(null);
   voiceRef.current = voiceOn ? voiceKey : null;
+  const speakingEngineRef = useRef<VoiceEngine>(speakingEngine);
+  speakingEngineRef.current = speakingEngine;
   // The score (`utils/rpg/music.ts`): composed on the reader's own ElevenLabs key only, never the
   // demo's, for the world and tone of the quest being played. Its switch is remembered.
   const musicKey = apiKeys.elevenLabs ?? null;
@@ -1505,6 +1515,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
         google: apiKeys.google,
         fal: falKeyRef.current,
         voice: voiceRef.current && voiceRef.current !== DEMO_VOICE_KEY ? voiceRef.current : null,
+        engine: speakingEngineRef.current,
         wish: (again ? again.wish : wished(askedNow) ? askedNow.text.trim() : '') || undefined,
       });
     } else {
@@ -3428,7 +3439,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
     voice: Boolean(voiceOn && voiceKey),
     music: Boolean(musicOn && musicKey),
     fal: Boolean(falKey),
-    voiceEngine: voiceKey === DEMO_VOICE_KEY ? ('elevenlabs' as const) : speakingEngine,
+    voiceEngine: speakingEngine,
   };
   const back = (
     <button type="button" className="rpg-menu-back" onClick={() => setMenu('main')}>
@@ -3739,16 +3750,20 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
               )}
             {storyProvider !== 'static' && storyProvider !== 'openai' && settingSwitch(t.fastStartTitle, t.fastStartNote(FAST_MODEL), fastStart, pickFastStart)}
             {storyProvider === 'google' && settingSwitch(t.introTitle, t.introNote, introOn, pickIntro)}
-            {/* Always drawn, so the rows under it never move when the keys answer; without a Google key only ElevenLabs can speak. */}
+            {/* Always drawn, so the rows under it never move when the keys answer. An engine with no key
+                behind it is greyed out; with no Gemini at all there is nothing to choose. */}
             {settingSelect(
               t.voiceEngine,
               <select
-                value={apiKeys.google ? voiceEngine : 'elevenlabs'}
-                disabled={!apiKeys.google}
+                value={speakingEngine}
+                disabled={!geminiCan}
                 onChange={(e) => pickVoiceEngine(voiceEngineOf(e.target.value))}
               >
-                <option value="gemini">{t.voiceEngines.gemini}</option>
-                <option value="elevenlabs">{t.voiceEngines.elevenlabs}</option>
+                {VOICE_ENGINES.map((e) => (
+                  <option key={e} value={e} disabled={isGemini(e) ? !geminiCan : !elevenCan}>
+                    {t.voiceEngines[e]}
+                  </option>
+                ))}
               </select>,
               <p className="rpg-set-note">{t.voiceEngineNote}</p>,
             )}
@@ -3837,7 +3852,7 @@ export default function Rpg({ lang, standalone = false }: { lang: Lang; standalo
                           : t.aiQuest(storyProvider)}
                 </li>
                 {storyProvider === 'static' && demo && !demo.available && demo.reason && <li>{t.demoClosed(demo.reason)}</li>}
-                <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice : voiceKey === ACCOUNT_KEY && !(speakingEngine === 'gemini' ? account.keys.google : account.keys.elevenLabs) ? t.dieselVoice(t.voiceEngines[speakingEngine]) : voiceKey ? t.voiceOn(t.voiceEngines[speakingEngine]) : t.voiceOff}</li>
+                <li>{voiceKey === DEMO_VOICE_KEY ? t.demoVoice(t.voiceEngines[speakingEngine]) : voiceKey === ACCOUNT_KEY && !(isGemini(speakingEngine) ? account.keys.google : account.keys.elevenLabs) ? t.dieselVoice(t.voiceEngines[speakingEngine]) : voiceKey ? t.voiceOn(t.voiceEngines[speakingEngine]) : t.voiceOff}</li>
                 {(storyProvider === 'static' || storyProvider === 'demo' || !voiceKey) && (
                   <li className="rpg-set-note">
                     {standalone && auth.user ? (storyProvider === 'demo' ? t.ownKeyBelow : t.addKeyBelow) : storyProvider === 'demo' ? t.ownKey : t.addKey}

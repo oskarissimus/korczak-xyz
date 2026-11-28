@@ -15,9 +15,10 @@ import {
 } from './geminiVoice';
 
 describe('voiceEngineOf', () => {
-  it('is Gemini unless ElevenLabs was chosen', () => {
-    expect(voiceEngineOf(null)).toBe('gemini');
-    expect(voiceEngineOf('nonsense')).toBe('gemini');
+  it('is Gemini Flash-Lite unless something else was chosen', () => {
+    expect(voiceEngineOf(null)).toBe('gemini-lite');
+    expect(voiceEngineOf('nonsense')).toBe('gemini-lite');
+    expect(voiceEngineOf('gemini')).toBe('gemini');
     expect(voiceEngineOf('elevenlabs')).toBe('elevenlabs');
   });
 });
@@ -121,7 +122,9 @@ describe('price', () => {
       ...parts,
       voiceEngine: 'gemini',
     })!;
+    const lite = questLitres('gemini-3.8-flash', { ...parts, voiceEngine: 'gemini-lite' })!;
     expect(gemini).toBeLessThan(eleven);
+    expect(lite).toBeLessThan(gemini);
   });
 });
 

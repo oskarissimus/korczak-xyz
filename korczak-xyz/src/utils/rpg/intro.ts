@@ -34,6 +34,8 @@ import { FLASH_MODEL, speechRequest } from './audioTags';
 import { voiceCreditsPerChar } from './cost';
 import { outOfFunds } from './funds';
 import { playClip, playStream, streamingAudio } from './voice';
+import { clipBlob, geminiClipOf, geminiModelOf, geminiSpeechRequest, isGemini, type VoiceEngine } from './geminiVoice';
+import { tokenCost } from './cost';
 import { introPrompt, parseIntro, picturePrompt, prologue, readingMs } from './introScript';
 import type { WorldSketch } from './genesis';
 import type { Lang } from './quest';
@@ -59,6 +61,12 @@ export const INTRO_MODELS: { model: string; thinking?: 'minimal' }[] = [
  */
 export const NARRATOR_VOICE = 'JBFqnCBsd6RMkjVDRZzb';
 const NARRATOR = 'narrator';
+/** The narrator on Gemini: a prebuilt voice of an older man, the nearest to George's warm storyteller. */
+export const GEMINI_NARRATOR_VOICE = 'Sadaltager';
+
+function onGemini(r: Run): boolean {
+  return Boolean(r.o.engine && isGemini(r.o.engine));
+}
 
 /** The pictures' size: 16:9, a third of a megapixel, so fal bills its smallest unit ($0.003). */
 export const PICTURE_SIZE = { width: 768, height: 432 } as const;
@@ -74,8 +82,13 @@ export interface IntroOptions {
   google: string;
   /** fal.ai, for the pictures; without it the frames are words on the dark. */
   fal: string | null;
-  /** ElevenLabs, for the voice; without it each frame stays up for a reader's time. */
+  /**
+   * The voice's key: Google's on a Gemini engine, ElevenLabs' otherwise (the game's one switch,
+   * `geminiVoice.ts`); without it each frame stays up for a reader's time.
+   */
   voice: string | null;
+  /** Who speaks; absent is ElevenLabs. */
+  engine?: VoiceEngine;
   /** The player's own description of the world, if they gave one. */
   wish?: string;
 }
@@ -330,8 +343,42 @@ async function failure(response: Response): Promise<string> {
   return body?.detail?.message || (typeof body?.detail === 'string' ? body.detail : '') || `ElevenLabs ${response.status}`;
 }
 
+/** A frame's clip on Gemini's TTS, whole, as a blob URL; no streaming endpoint is needed for a short line. */
+async function geminiClip(r: Run, text: string): Promise<string> {
+  const model = geminiModelOf(r.o.engine!);
+  const entry = startRequest('voice', `${model} · ${NARRATOR}`, null, text, 'intro');
+  try {
+    if (r.controller.signal.aborted) throw new Error('skipped');
+    const [url, init] = geminiSpeechRequest(r.o.voice!, GEMINI_NARRATOR_VOICE, text, model);
+    const response = await apiFetch(url, { ...init, signal: r.controller.signal });
+    const json = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(json?.error?.message || `Gemini TTS ${response.status}`);
+    const clip = geminiClipOf(json);
+    const blob = URL.createObjectURL(clipBlob(clip));
+    r.urls.push(blob);
+    endRequest(entry, null, { chars: text.length, credits: 0, serverCost: serverCost(response) ?? tokenCost(model, clip.usage) });
+    return blob;
+  } catch (e) {
+    endRequest(entry, r.controller.signal.aborted ? 'skipped' : e instanceof Error ? e.message : String(e));
+    throw e;
+  }
+}
+
 /** A frame's clip, whole, as a blob URL; null when it could not be had (the frame is then read). */
 async function fetchClip(r: Run, text: string): Promise<string | null> {
+  if (onGemini(r)) {
+    if (outOfFunds('google')) return null;
+    if (r.clipsRunning >= CLIPS_AT_ONCE) await new Promise<void>((resolve) => r.clipQueue.push(resolve));
+    r.clipsRunning += 1;
+    try {
+      return await geminiClip(r, text);
+    } catch {
+      return null;
+    } finally {
+      r.clipsRunning -= 1;
+      r.clipQueue.shift()?.();
+    }
+  }
   if (outOfFunds('elevenlabs')) return null;
   if (r.clipsRunning >= CLIPS_AT_ONCE) await new Promise<void>((resolve) => r.clipQueue.push(resolve));
   r.clipsRunning += 1;
@@ -460,7 +507,7 @@ async function tell(r: Run): Promise<void> {
     shownPicture(r);
     let spoken = false;
     if (r.o.voice) {
-      if (i === 0 && streamingAudio()) {
+      if (i === 0 && streamingAudio() && !onGemini(r)) {
         spoken = await streamClip(r, w.text, () => heard(r));
       } else {
         const url = i === 0 ? await fetchClip(r, w.text) : await w.clip;

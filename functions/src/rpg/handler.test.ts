@@ -258,7 +258,7 @@ describe('rpgDemo', () => {
     const fetch = vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
     vi.stubGlobal('fetch', fetch);
     const res = response();
-    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Hunter.', voice: 'female', lang: 'pl', guest: SPEAKER }), res);
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Hunter.', voice: 'female', lang: 'pl', guest: SPEAKER, engine: 'elevenlabs' }), res);
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('audio/mpeg');
     expect(fetch.mock.calls[0][1].headers['xi-api-key']).toBe('sk_owner-0000000000');
@@ -275,7 +275,7 @@ describe('rpgDemo', () => {
     const fetch = vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
     vi.stubGlobal('fetch', fetch);
     const res = response();
-    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Pył. [Kaszel].', voice: 'female', lang: 'pl', guest: SPEAKER }), res);
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Pył. [Kaszel].', voice: 'female', lang: 'pl', guest: SPEAKER, engine: 'elevenlabs' }), res);
     expect(res.statusCode).toBe(200);
     expect(res.headers['x-demo-model']).toBe('eleven_v4');
     expect(fetch.mock.calls[0][0]).toContain('/v1/text-to-dialogue');
@@ -288,10 +288,36 @@ describe('rpgDemo', () => {
       .mockResolvedValueOnce(new Response('{}', { status: 422 }))
       .mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
     const refused = response();
-    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Ja... (kaszle) Dobrze!', voice: 'male', lang: 'pl', guest: SPEAKER }), refused);
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Ja... (kaszle) Dobrze!', voice: 'male', lang: 'pl', guest: SPEAKER, engine: 'elevenlabs' }), refused);
     expect(refused.statusCode).toBe(200);
     expect(refused.headers['x-demo-model']).toBe('eleven_flash_v2_5');
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ model_id: 'eleven_flash_v2_5', text: 'Ja... Dobrze!' });
+  });
+
+  it('speaks on Gemini Flash-Lite TTS by default, priced by the answer\'s tokens', async () => {
+    const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(40), Buffer.from([1, 2, 3, 4])]);
+    const answer = {
+      candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/wav', data: wav.toString('base64') } }] } }],
+      usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 100 },
+    };
+    const fetch = vi.fn(async (..._: unknown[]) => new Response(JSON.stringify(answer), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    const res = response();
+    const who = { name: 'Elara', gender: 'female', age: 'old', voice: 'Native Polish. Emotion: Weary, warm.' };
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Hunter.', voice: 'female', who, lang: 'pl', guest: SPEAKER }), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toBe('audio/wav');
+    expect(res.headers['x-demo-model']).toBe('gemini-3.8-flash-lite-tts');
+    expect(fetch.mock.calls[0][0]).toContain('/models/gemini-3.8-flash-lite-tts:generateContent');
+    const sent = JSON.parse((fetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(sent.contents[0].parts[0].text).toBe('[weary, warm] Hunter.');
+    expect(['Gacrux', 'Sulafat']).toContain(sent.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName);
+    expect(spent().all).toBeCloseTo((20 * 0.5 + 100 * 6) / 1e6, 9);
+
+    fetch.mockClear();
+    const flash = response();
+    await handleRpgDemo(request('POST', { kind: 'voice', text: 'Hunter.', voice: 'player', lang: 'pl', guest: SPEAKER, engine: 'gemini' }), flash);
+    expect(flash.headers['x-demo-model']).toBe('gemini-3.8-flash-tts');
   });
 
   it('hands over every voice search of a language at once, and asks the library only once a week', async () => {

@@ -17,7 +17,7 @@
  */
 
 import { musicUsd, tokenCost, voiceCost } from './cost';
-import { GEMINI_TTS_MODEL } from './geminiVoice';
+import { geminiModelOf, isGemini, type VoiceEngine } from './geminiVoice';
 import { clipCost, priceAs } from './demoLimits';
 import { localeOf } from './language';
 
@@ -62,9 +62,10 @@ const QUEST_BEATS = 6;
  */
 const QUEST_VOICE_CREDITS = 5_000;
 /**
- * The same quest on Gemini Flash TTS (`geminiVoice.ts`, the default voice since 27 Nov 2026): ~7,000
- * characters, ~0.37 text and ~1.67 audio tokens a character (one 150-character Polish line measured
- * that day: 55 in, 250 out), priced at the day's rate: ~$0.11 until 31 Dec 2026, twice that after.
+ * The same quest on Gemini's TTS (`geminiVoice.ts`; Flash-Lite the default since 28 Nov 2026): ~7,000
+ * characters, ~0.37 text and ~1.67 audio tokens a character (one 150-character Polish line measured on
+ * 27 Nov: 55 in, 250 out), priced at the day's rate by the model chosen: ~$0.07 on Flash-Lite and ~$0.11
+ * on Flash until 31 Dec 2026, twice that after.
  */
 const QUEST_VOICE_CHARS = 7_000;
 const GEMINI_VOICE_TOKENS = {
@@ -89,13 +90,13 @@ export interface PriceParts {
   music: boolean;
   fal: boolean;
   /** Who speaks; absent is ElevenLabs, as before there was a choice. */
-  voiceEngine?: 'gemini' | 'elevenlabs';
+  voiceEngine?: VoiceEngine;
 }
 
 /** A quest's lines in dollars on the engine that speaks them. */
 function questVoiceUsd(parts: PriceParts): number {
   if (!parts.voice) return 0;
-  if (parts.voiceEngine === 'gemini') return tokenCost(GEMINI_TTS_MODEL, GEMINI_VOICE_TOKENS) ?? 0;
+  if (parts.voiceEngine && isGemini(parts.voiceEngine)) return tokenCost(geminiModelOf(parts.voiceEngine), GEMINI_VOICE_TOKENS) ?? 0;
   return voiceCost(QUEST_VOICE_CREDITS);
 }
 
